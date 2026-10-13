@@ -150,8 +150,14 @@ const DEF=[
 ['Gran estuche familiar',0,8.5,13.5],['Surtido mini turrones',0,3.6,6.5],['Bombones de coco',0,2.6,5],['Turrettas',0,3.6,6.5],['Almendras rellenas',0,3,6],['Corazón de turrón',0,4,7],['Bom-ball',0,3.6,6.5],['Trufas clásicas al cacao',0,2.5,4],['Barquillos turrón chocolate',0,3.6,6.5],['Hucha tubettos',0,3.3,6.5],['Encendedor + cargador',0,3,6],['Pulsera',0,3,6],
 ['Caja marrón. 1400 kg',1,12.5,17],['Caja azul. 1900 kg',1,15,19],['Diver tazas',1,5.7,9],
 ['Colonias',2,4.5,10],['Papeleta de lotería',3,4,5]].map(a=>mk(a[0],PROVS[a[1]],a[2],a[3]));
-let S;
+let S,HAD=false;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+HAD=!!(S&&S.products);
+const IDB={open:()=>new Promise((res,rej)=>{const r=indexedDB.open('hucha',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}),
+put:v=>IDB.open().then(db=>new Promise(res=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,'S');t.oncomplete=()=>res();t.onerror=()=>res()})).catch(()=>{}),
+get:()=>IDB.open().then(db=>new Promise(res=>{const r=db.transaction('kv').objectStore('kv').get('S');r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)})).catch(()=>null)};
+if(!HAD){try{IDB.get().then(v=>{if(!v)return;try{const d=JSON.parse(v);if(d&&Array.isArray(d.products)){localStorage.setItem(KEY,v);location.reload()}}catch(e){}})}catch(e){}}
+try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
 if(!S||!S.products)S={products:DEF,sales:[],goal:600,trip:'',cel:[],tab:'pedidos',pending:false,orders:[],filter:'todos',open:null};
 if(!S.trip)S.trip='2027-04-06';
 if(!S.orders)S.orders=[];if(!['todos','pedido','recibido','pagado'].includes(S.filter))S.filter='todos';if(S.open===undefined)S.open=null;
@@ -159,7 +165,7 @@ if(!['pedidos','hucha','historial','ajustes'].includes(S.tab))S.tab='pedidos';
 if(!S.draft)S.draft={name:'',q:{}};
 S.orders.forEach(o=>o.items.forEach(i=>{if('got' in i){i.rec=i.got?i.qty:0;delete i.got}}));
 S.orders.forEach(o=>{if('delivered' in o){o.paid=!!o.delivered;delete o.delivered;delete o.dd}});
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const save=()=>{const j=JSON.stringify(S);try{localStorage.setItem(KEY,j)}catch(e){}try{IDB.put(j)}catch(e){}};
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const eur=n=>(Math.round(n*100)/100).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
@@ -276,6 +282,21 @@ const blob=await new Promise(r=>cv.toBlob(r,'image/png'));
 try{const file=new File([blob],fname,{type:'image/png'});
 if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Pedido de '+o.name});return}}catch(e){if(e&&e.name==='AbortError')return}
 showImg(cv.toDataURL('image/png'),fname)}
+
+async function exportData(){S.lastBackup=new Date().toISOString();save();
+const json=JSON.stringify(S,null,1),d=new Date(),pad=n=>String(n).padStart(2,'0');
+const fname='Copia-hucha-'+d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'.json';
+const mh=window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.share;
+if(mh){mh.postMessage({data:btoa(unescape(encodeURIComponent(json))),ext:'json'});render();return}
+const blob=new Blob([json],{type:'application/json'});
+try{const file=new File([blob],fname,{type:'application/json'});
+if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Copia de la hucha'});render();return}}catch(e){if(e&&e.name==='AbortError')return}
+const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);render()}
+function importData(inp){const f=inp.files&&inp.files[0];if(!f)return;const r=new FileReader();
+r.onload=()=>{let d;try{d=JSON.parse(r.result);if(!d||!Array.isArray(d.products)||!Array.isArray(d.sales||[])||!Array.isArray(d.orders||[]))throw 0}catch(e){toast('El fichero no es una copia válida');inp.value='';return}
+if(!confirm('Se sustituirán todos los datos de este móvil por los de la copia ('+(d.orders||[]).length+' pedidos). ¿Seguro?')){inp.value='';return}
+try{const j=JSON.stringify(d);localStorage.setItem(KEY,j);IDB.put(j).then(()=>location.reload())}catch(e){toast('No se pudo importar')}};
+r.readAsText(f)}
 function setF(f){S.filter=f;save();render()}
 
 const V={};
@@ -352,6 +373,9 @@ S.products.forEach(p=>{h+=`<div class="ed"><div class="full"><b>${esc(p.name)}</
 <div><label>Venta (€)</label><input type="number" inputmode="decimal" step="0.01" value="${p.sell}" onchange="setP('${p.id}','sell',this.value)"></div>
 <div><label>Proveedor</label><select onchange="setP('${p.id}','prov',this.value)">${PROVS.map(x=>`<option ${x===p.prov?'selected':''}>${x}</option>`).join('')}</select></div>
 <div class="full"><button class="sm red" onclick="delP('${p.id}')">Borrar producto</button></div></div>`});
+h+=`<h2>Copia de seguridad</h2><p class="sub">Guarda un fichero con todos tus pedidos y datos. Si cambias de móvil o se borran los datos del navegador, lo importas y lo recuperas. Última copia: ${S.lastBackup?dfmt(S.lastBackup):'nunca'}.</p>
+<button class="cta" onclick="exportData()">Exportar copia</button>
+<label class="cta" style="display:block;text-align:center">Importar copia<input type="file" accept="application/json,.json" hidden onchange="importData(this)"></label>`;
 return h+`<button class="cta" onclick="addP()">Añadir producto</button><button class="cta" style="border-color:var(--bad);color:var(--bad)" onclick="reset()">Borrar todas las ventas</button>`};
 
 const TABS=[['pedidos','Pedidos'],['hucha','Hucha'],['historial','Historial'],['ajustes','Ajustes']];
