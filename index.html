@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -340,7 +341,7 @@ lo.forEach(o=>{const st=ostat(o);h+=`<button class="ord s${st}" onclick="openO('
 if(ld.length){h+='<h2>Ventas anteriores</h2>'+ld.map(s=>{const p=P(s.pid);return`<div class="row"><div class="n"><b>${p?esc(p.name):'Producto borrado'}</b><small>${dfmt(s.d)} · ${eur(p?p.sell:0)} · ganas ${eur(gain(s))}</small></div><button class="sm red" aria-label="Borrar venta" onclick="delSale('${s.id}')">Borrar</button></div>`}).join('')}
 return h};
 
-const foot=()=>'<footer class="ft">Hecho por Darío González Albarracín · 3º ESO A · 2026</footer>';
+const foot=()=>'<footer class="ft">Hecho por Darío · 2026</footer>';
 
 V.ajustes=()=>{if(!UNL)return `<h2 style="margin-top:14px;font-size:22px">Ajustes</h2><p class="sub">Introduce la contraseña para entrar.</p>
 <div class="ed"><div class="full"><label for="pw">Contraseña</label><input id="pw" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')tryPw()"></div></div>
