@@ -161,8 +161,9 @@ try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}
 if(!S||!S.products)S={products:DEF,sales:[],goal:600,trip:'',cel:[],tab:'pedidos',pending:false,orders:[],filter:'todos',open:null};
 if(!S.trip)S.trip='2027-04-06';
 if(!S.orders)S.orders=[];if(!['todos','pedido','recibido','pagado'].includes(S.filter))S.filter='todos';if(S.open===undefined)S.open=null;
-if(!['pedidos','hucha','historial','ajustes'].includes(S.tab))S.tab='pedidos';
+if(!['pedidos','hucha','historial','ajustes','clases'].includes(S.tab))S.tab='pedidos';
 if(!S.draft)S.draft={name:'',q:{}};
+if(!S.me)S.me={name:'',cls:''};if(!S.out)S.out=[];
 S.orders.forEach(o=>o.items.forEach(i=>{if('got' in i){i.rec=i.got?i.qty:0;delete i.got}}));
 S.orders.forEach(o=>{if('delivered' in o){o.paid=!!o.delivered;delete o.delivered;delete o.dd}});
 const save=()=>{const j=JSON.stringify(S);try{localStorage.setItem(KEY,j)}catch(e){}try{IDB.put(j)}catch(e){}};
@@ -202,7 +203,7 @@ function delP(id){if(!confirm('¿Borrar este producto y todas sus ventas?'))retu
 function setGoal(v){S.goal=Math.max(1,num(v)||600);save();render()}
 function setTrip(v){S.trip=v;save();render()}
 function reset(){if(confirm('Se borrarán todas las ventas, los pedidos y las celebraciones. ¿Seguro?')){S.sales=[];S.orders=[];S.open=null;S.cel=[];save();render()}}
-function tab(t){if(t!=='ajustes')UNL=false;S.tab=t;S.open=null;save();render();window.scrollTo(0,0)}
+function tab(t){if(t!=='ajustes')UNL=false;if(t!=='clases'){TU=false;TTK='';TPW='';TD=null;TC=''}S.tab=t;S.open=null;save();render();window.scrollTo(0,0)}
 function sha256(str){const rr=(v,a)=>(v>>>a)|(v<<(32-a));const K=[],H=[],isP={};let pc=0;
 for(let c=2;pc<64;c++){if(!isP[c]){for(let i=0;i<313;i+=c)isP[i]=c;H[pc]=(Math.pow(c,.5)*4294967296)|0;K[pc++]=(Math.pow(c,1/3)*4294967296)|0}}
 const hh=H.slice(0,8);const by=Array.from(new TextEncoder().encode(str));const bl=by.length*8;by.push(0x80);while(by.length%64!==56)by.push(0);
@@ -224,8 +225,10 @@ function finish(){const n=S.draft.name.trim();
 if(!n){toast('Escribe para quién es el pedido');const e=$('#on');if(e)e.focus();return}
 const items=S.products.filter(p=>S.draft.q[p.id]>0).map(p=>({pid:p.id,name:p.name,price:p.sell,qty:S.draft.q[p.id],rec:0}));
 if(!items.length){toast('Selecciona al menos un producto');return}
-S.orders.push({id:nid('o'),name:n,d:new Date().toISOString(),items:items,paid:false});
-S.draft={name:'',q:{}};save();render();window.scrollTo(0,0);toast('Pedido guardado en Historial')}
+const o0={id:nid('o'),name:n,d:new Date().toISOString(),items:items,paid:false};S.orders.push(o0);let msg='Pedido guardado en Historial';
+if(S.me.name&&S.me.cls){o0.cls=S.me.cls;S.out.push({id:o0.id,alumno:S.me.name,clase:S.me.cls,para:n,d:o0.d,total:Math.round(otot(o0)*100)/100,items:items.map(i=>({name:i.name,qty:i.qty,price:i.price})),prep:false});msg+='. Se enviará a los profesores'}
+else msg+=' (sin enviar: pon tu nombre y clase en Ajustes)';
+S.draft={name:'',q:{}};save();render();window.scrollTo(0,0);toast(msg);flush()}
 function openO(id){S.open=id;save();render();window.scrollTo(0,0)}
 function closeO(){S.open=null;save();render();window.scrollTo(0,0)}
 function recq(id,k,d){const o=O(id);if(!o||o.paid)return;const i=o.items[k];let n=rcv(i)+d;if(n<0)n=i.qty;if(n>i.qty)n=i.qty;i.rec=n;save();render()}
@@ -344,7 +347,7 @@ return h+BK()};
 V.historial=()=>{
 if(S.open){const o=O(S.open);if(o){const st=ostat(o),tot=otot(o);
 let h=`<button class="back" onclick="closeO()">← Historial</button>
-<div class="ord s${st}" style="margin-top:0"><div class="l1"><b>${esc(o.name)}</b><span class="stt">${SL[st]}</span></div><small>${dfmt(o.d)}${o.paid&&o.pd?' · pagado '+dfmt(o.pd):''}</small></div>
+<div class="ord s${st}" style="margin-top:0"><div class="l1"><b>${esc(o.name)}</b><span class="stt">${SL[st]}</span></div><small>${dfmt(o.d)}${o.paid&&o.pd?' · pagado '+dfmt(o.pd):''}${o.cls?' · '+(o.sent?'enviado a profesores':'pendiente de enviar'):''}</small></div>
 <h2>Productos</h2><p class="sub">Indica con − y + cuántas unidades de cada producto te han llegado. Llevas ${runits(o)} de ${units(o)}.</p>`;
 o.items.forEach((i,k)=>{const r=rcv(i),miss=r<i.qty;h+=`<div class="row${miss?' miss':''}"><div class="n"><b>${esc(i.name)}</b><small>Pedidas: <b class="inl">${i.qty}</b> · ${eur(i.qty*i.price)}</small>${miss?`<small class="lack">Faltan ${i.qty-r}</small>`:''}</div>
 <div class="ctl"><button class="pm" ${o.paid?'disabled':''} aria-label="Una menos de ${esc(i.name)}" onclick="recq('${o.id}',${k},-1)">−</button><span aria-label="Recibidas">${r}</span><button class="pm plus" ${o.paid?'disabled':''} aria-label="Una más de ${esc(i.name)}" onclick="recq('${o.id}',${k},1)">+</button></div></div>`});
@@ -369,7 +372,7 @@ const foot=()=>'<footer class="ft">Hecho por Darío · 2026</footer>';
 
 V.ajustes=()=>{if(!UNL)return `<h2 style="margin-top:14px;font-size:22px">Ajustes</h2><p class="sub">Introduce la contraseña para entrar.</p>
 <div class="ed"><div class="full"><label for="pw">Contraseña</label><input id="pw" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')tryPw()"></div></div>
-<p id="pwe" class="lack" role="alert" style="margin:8px 0 0;min-height:1.4em"></p><button class="cta ok" onclick="tryPw()">Entrar</button>`;
+<p id="pwe" class="lack" role="alert" style="margin:8px 0 0;min-height:1.4em"></p><button class="cta ok" onclick="tryPw()">Entrar</button>`+ME();
 let h=`<h2>Objetivo y viaje</h2><div class="ed"><div class="full"><label>Objetivo de la hucha (€)</label><input type="number" inputmode="decimal" value="${S.goal}" onchange="setGoal(this.value)"></div><div class="full"><label>Salida de Valencia</label><input type="date" value="${S.trip}" onchange="setTrip(this.value)"></div></div><h2>Productos y precios</h2>`;
 S.products.forEach(p=>{h+=`<div class="ed"><div class="full"><b>${esc(p.name)}</b></div>
 <div><label>Compra (€)</label><input type="number" inputmode="decimal" step="0.01" value="${p.buy}" onchange="setP('${p.id}','buy',this.value)"></div>
@@ -377,9 +380,62 @@ S.products.forEach(p=>{h+=`<div class="ed"><div class="full"><b>${esc(p.name)}</
 <div><label>Proveedor</label><select onchange="setP('${p.id}','prov',this.value)">${PROVS.map(x=>`<option ${x===p.prov?'selected':''}>${x}</option>`).join('')}</select></div>
 <div class="full"><button class="sm red" onclick="delP('${p.id}')">Borrar producto</button></div></div>`});
 
-return h+`<button class="cta" onclick="addP()">Añadir producto</button><button class="cta" style="border-color:var(--bad);color:var(--bad)" onclick="reset()">Borrar todas las ventas</button>`};
+h+=ME();return h+`<button class="cta" onclick="addP()">Añadir producto</button><button class="cta" style="border-color:var(--bad);color:var(--bad)" onclick="reset()">Borrar todas las ventas</button>`};
 
-const TABS=[['pedidos','Pedidos'],['hucha','Hucha'],['historial','Historial'],['ajustes','Ajustes']];
+
+/* ===== Pedidos compartidos con los profesores (Firebase Firestore, REST) ===== */
+const FB={key:'AIzaSyCHAR9gxcwWdSozF-S4vpjB37noLwJAXOk',proj:'ontheway-429c5'},TEMAIL='profes@ontheway.app',CLS=['3A','3B','3C','PDC'],CLN={'3A':'3º A','3B':'3º B','3C':'3º C','PDC':'PDC'};
+const FBU=()=>'https://firestore.googleapis.com/v1/projects/'+FB.proj+'/databases/(default)/documents';
+const ff=o=>{const r={};for(const k in o)r[k]=fv(o[k]);return r};
+const fv=v=>typeof v==='string'?{stringValue:v}:typeof v==='boolean'?{booleanValue:v}:typeof v==='number'?(Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v}):Array.isArray(v)?{arrayValue:{values:v.map(fv)}}:{mapValue:{fields:ff(v)}};
+const uf=f=>{const r={};for(const k in f)r[k]=uv(f[k]);return r};
+const uv=v=>'stringValue' in v?v.stringValue:'integerValue' in v?+v.integerValue:'doubleValue' in v?v.doubleValue:'booleanValue' in v?v.booleanValue:'arrayValue' in v?(v.arrayValue.values||[]).map(uv):'mapValue' in v?uf(v.mapValue.fields||{}):null;
+const JH={'Content-Type':'application/json'};
+let FL=false;
+async function flush(){if(FL||!FB.proj||!S.out||!S.out.length)return;FL=true;let n=0;
+try{for(const p of S.out.slice()){let r;try{r=await fetch(FBU()+'/pedidos?documentId='+encodeURIComponent(p.id)+'&key='+FB.key,{method:'POST',headers:JH,body:JSON.stringify({fields:ff(p)})})}catch(e){break}
+if(r.ok||r.status===409){S.out=S.out.filter(x=>x.id!==p.id);const o=O(p.id);if(o)o.sent=true;save();n++}else break}}finally{FL=false}
+if(n){toast(n>1?'Pedidos enviados a los profesores':'Pedido enviado a los profesores');if(S.tab==='historial')render()}}
+window.addEventListener('online',flush);setTimeout(flush,1500);setInterval(flush,60000);
+function setMeName(v){S.me.name=v.trim().slice(0,60);save();const e=$('#mst');if(e)e.textContent=meTxt()}
+function setMeCls(c){S.me.cls=c;save();render()}
+const meTxt=()=>S.me.name&&S.me.cls?'Pedidos de '+S.me.name+' ('+CLN[S.me.cls]+').':'Falta el nombre o la clase: los pedidos se quedarán solo en este móvil.';
+const ME=()=>`<h2>Alumno</h2><p class="sub">Pon tu nombre y tu clase para que tus pedidos lleguen a los profesores.</p>
+<div class="ed"><div class="full"><label for="mn">Nombre del alumno</label><input id="mn" type="text" value="${esc(S.me.name)}" maxlength="60" autocomplete="off" oninput="setMeName(this.value)"></div></div>
+<div class="chips">${CLS.map(c=>`<button class="chip ${S.me.cls===c?'on':''}" onclick="setMeCls('${c}')">${CLN[c]}</button>`).join('')}</div>
+<p class="sub" id="mst" style="margin-top:8px">${esc(meTxt())}</p>`;
+/* Profesores */
+let TU=false,TTK='',TPW='',TD=null,TC='',TERR='';
+async function tSign(pw){const r=await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+FB.key,{method:'POST',headers:JH,body:JSON.stringify({email:TEMAIL,password:pw,returnSecureToken:true})});if(!r.ok)throw new Error('auth');TTK=(await r.json()).idToken}
+async function tFetch(url,opt){for(let a=0;a<2;a++){const r=await fetch(url,Object.assign({},opt,{headers:Object.assign({Authorization:'Bearer '+TTK},JH)}));if((r.status===401||r.status===403)&&a===0){await tSign(TPW);continue}if(!r.ok)throw new Error('http'+r.status);return r}}
+async function tLoad(){const r=await tFetch(FBU()+':runQuery?key='+FB.key,{method:'POST',body:JSON.stringify({structuredQuery:{from:[{collectionId:'pedidos'}]}})});
+const j=await r.json();TD=j.filter(x=>x.document).map(x=>uf(x.document.fields));TD.sort((a,b)=>a.d<b.d?1:-1);TERR=''}
+async function tTry(){const e=$('#tpw'),m=$('#tpe');
+if(sha256(e.value)!==PWH){e.value='';m.textContent='Contraseña incorrecta';e.focus();return}
+if(!FB.proj){m.textContent='El servidor todavía no está configurado.';return}
+m.textContent='Entrando…';TPW=e.value;
+try{await tSign(TPW)}catch(x){TPW='';m.textContent=navigator.onLine?'El servidor no ha aceptado la contraseña.':'Sin conexión.';return}
+TU=true;try{await tLoad()}catch(x){TERR='No se pudieron cargar los pedidos.'}
+render();window.scrollTo(0,0)}
+async function tRefresh(){try{await tLoad()}catch(x){TERR='No se pudieron cargar los pedidos.'}if(TU&&S.tab==='clases')render()}
+function tSel(c){TC=c;render();window.scrollTo(0,0)}
+async function tPrep(id){const d=(TD||[]).find(x=>x.id===id);if(!d)return;const v=!d.prep;
+try{await tFetch(FBU()+'/pedidos/'+encodeURIComponent(id)+'?updateMask.fieldPaths=prep&key='+FB.key,{method:'PATCH',body:JSON.stringify({fields:{prep:{booleanValue:v}}})});d.prep=v;render()}catch(e){toast('No se pudo guardar el cambio')}}
+setInterval(()=>{if(TU&&S.tab==='clases')tRefresh()},30000);
+V.clases=()=>{if(!TU)return `<h2 style="margin-top:14px;font-size:22px">Clases</h2><p class="sub">Solo para profesores. Introduce la contraseña.</p>
+<div class="ed"><div class="full"><label for="tpw">Contraseña</label><input id="tpw" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')tTry()"></div></div>
+<p id="tpe" class="lack" role="alert" style="margin:8px 0 0;min-height:1.4em"></p><button class="cta ok" onclick="tTry()">Entrar</button>`;
+const D=TD||[];const by=c=>D.filter(x=>x.clase===c);
+const err=TERR?`<p class="lack" role="alert">${esc(TERR)}</p>`:'';
+if(!TC){return `<h2 style="margin-top:14px;font-size:22px">Clases</h2><p class="sub">Elige una clase para ver los pedidos de sus alumnos.</p>${err}`+CLS.map(c=>{const L=by(c),np=L.filter(x=>!x.prep).length;return `<button class="cta" style="text-align:left;padding:16px" onclick="tSel('${c}')"><b style="font-size:19px">${CLN[c]}</b><br><small style="font-weight:500">${L.length} pedido${L.length===1?'':'s'}${np?' · '+np+' por preparar':L.length?' · todo preparado':''}</small></button>`}).join('')+`<button class="cta" onclick="tRefresh()">Actualizar</button>`}
+const L=by(TC),P0=L.filter(x=>!x.prep);const m={};P0.forEach(x=>x.items.forEach(i=>{m[i.name]=(m[i.name]||0)+i.qty}));
+let h=`<button class="back" onclick="tSel('')">← Clases</button><h2>${CLN[TC]}</h2>${err}<h2>Material por preparar</h2>`;
+const ks=Object.keys(m);h+=ks.length?ks.map(k=>`<div class="row"><div class="n"><b>${esc(k)}</b></div><b>${m[k]} ud.</b></div>`).join(''):'<div class="empty">No hay material pendiente.</div>';
+h+='<h2>Pedidos</h2>';
+h+=L.length?L.map(x=>`<div class="ord s${x.prep?2:0}"><div class="l1"><b>${esc(x.alumno)}</b><span class="stt">${x.prep?'Preparado':'Por preparar'}</span></div><small>Para: ${esc(x.para)} · ${dfmt(x.d)} · ${eur(x.total)}</small><div style="margin-top:6px;font-size:14.5px">${x.items.map(i=>esc(i.name)+' × '+i.qty).join('<br>')}</div><button class="sm" style="margin-top:8px" onclick="tPrep('${x.id}')">${x.prep?'Marcar como no preparado':'Marcar como preparado'}</button></div>`).join(''):'<div class="empty">Todavía no hay pedidos de esta clase.</div>';
+return h+`<button class="cta" onclick="tRefresh()">Actualizar</button>`};
+
+const TABS=[['pedidos','Pedidos'],['hucha','Hucha'],['historial','Historial'],['clases','Clases'],['ajustes','Ajustes']];
 function render(){const T=tot();
 $('#hb').textContent=eur(T.paid)+' / '+eur(S.goal);$('#hf').style.width=pct()+'%';
 $('#nav').innerHTML=TABS.map(t=>`<button class="${S.tab===t[0]?'on':''}" onclick="tab('${t[0]}')">${t[1]}</button>`).join('');
