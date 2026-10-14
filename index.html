@@ -451,14 +451,15 @@ try{TPR=await tKey(e.value)}catch(x){m.textContent='No se pudo preparar la clave
 TU=true;try{await tLoad()}catch(x){TERR='No se pudieron cargar los pedidos (¿sin conexión?).'}
 render();window.scrollTo(0,0)}
 async function tRefresh(){try{await tLoad()}catch(x){TERR='No se pudieron cargar los pedidos (¿sin conexión?).'}if(TU&&S.tab==='clases')render()}
-function tSel(c){TC=c;render();window.scrollTo(0,0)}
+function tSel(c){TC=c;render();window.scrollTo(0,0);tRefresh()}
 async function tPrep(id){const d=(TD||[]).find(x=>x.id===id);if(!d)return;const v=!d.prep;
 try{const r=await fetch(FBU()+'/pedidos/'+encodeURIComponent(id)+'?updateMask.fieldPaths=prep&key='+FB.key,{method:'PATCH',headers:JH,body:JSON.stringify({fields:{prep:{booleanValue:v}}})});if(!r.ok)throw 0;d.prep=v;render()}catch(e){toast('No se pudo guardar el cambio')}}
 async function tDel(id){const d=(TD||[]).find(x=>x.id===id);if(!d)return;
 if(!confirm('¿Borrar el pedido de '+d.alumno+'? Desaparecerá para todos los profesores.'))return;
 if(!confirm('Segunda confirmación: el pedido de '+d.alumno+' se borrará definitivamente y no se puede recuperar. ¿Borrarlo?'))return;
 try{const r=await fetch(FBU()+'/pedidos/'+encodeURIComponent(id)+'?key='+FB.key,{method:'DELETE'});if(!r.ok&&r.status!==404)throw 0;TD=TD.filter(x=>x.id!==id);render();toast('Pedido borrado')}catch(e){toast('No se pudo borrar el pedido')}}
-setInterval(()=>{if(TU&&S.tab==='clases')tRefresh()},30000);
+setInterval(()=>{if(TU&&S.tab==='clases'&&!document.hidden)tRefresh()},8000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&TU&&S.tab==='clases')tRefresh()});window.addEventListener('focus',()=>{if(TU&&S.tab==='clases')tRefresh()});
 V.clases=()=>{if(!TU)return `<h2 style="margin-top:14px;font-size:22px">Clases</h2><p class="sub">Solo para profesores. Introduce la contraseña.</p>
 <div class="ed"><div class="full"><label for="tpw">Contraseña</label><input id="tpw" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')tTry()"></div></div>
 <p id="tpe" class="lack" role="alert" style="margin:8px 0 0;min-height:1.4em"></p><button class="cta ok" onclick="tTry()">Entrar</button>`;
