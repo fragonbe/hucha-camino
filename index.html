@@ -33,6 +33,10 @@ nav button:nth-child(2).on{border-top-color:var(--acc)}
 nav button:nth-child(3).on{border-top-color:var(--c1);color:var(--c1)}
 nav button:nth-child(4).on{border-top-color:var(--c2);color:var(--c2)}
 nav button:nth-child(5).on{border-top-color:var(--c3);color:var(--c3)}
+nav button:nth-child(6).on{border-top-color:var(--c0);color:var(--c0)}
+nav button{font-size:12.5px}
+.gl{margin:6px 0 0;padding-left:20px;font-size:15px;line-height:1.5}.gl li{margin:6px 0}
+.mail{display:block;text-align:center;text-decoration:none;color:var(--ink)}
 .stats .st:nth-child(1){border-top:5px solid var(--c1)}
 .stats .st:nth-child(2){border-top:5px solid var(--c0)}
 .stats .st:nth-child(3){border-top:5px solid var(--c3)}
@@ -161,7 +165,7 @@ try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}
 if(!S||!S.products)S={products:DEF,sales:[],goal:600,trip:'',cel:[],tab:'pedidos',pending:false,orders:[],filter:'todos',open:null};
 if(!S.trip)S.trip='2027-04-06';
 if(!S.orders)S.orders=[];if(!['todos','pedido','recibido','pagado'].includes(S.filter))S.filter='todos';if(S.open===undefined)S.open=null;
-if(!['pedidos','hucha','historial','ajustes','clases'].includes(S.tab))S.tab='pedidos';
+if(!['pedidos','hucha','historial','ajustes','clases','info'].includes(S.tab))S.tab='pedidos';
 if(!S.draft)S.draft={name:'',q:{}};
 if(!S.me)S.me={name:'',cls:''};if(!S.out)S.out=[];
 S.orders.forEach(o=>o.items.forEach(i=>{if('got' in i){i.rec=i.got?i.qty:0;delete i.got}}));
@@ -459,7 +463,38 @@ h+='<h2>Pedidos</h2>';
 h+=L.length?L.map(x=>`<div class="ord s${x.prep?2:0}"><div class="l1"><b>${esc(x.alumno)}</b><span class="stt">${x.prep?'Preparado':'Por preparar'}</span></div><small>Para: ${esc(x.para)} · ${dfmt(x.d)} · ${eur(x.total)}</small><div style="margin-top:6px;font-size:14.5px">${x.items.map(i=>esc(i.name)+' × '+i.qty).join('<br>')}</div><button class="sm" style="margin-top:8px" onclick="tPrep('${x.id}')">${x.prep?'Marcar como no preparado':'Marcar como preparado'}</button></div>`).join(''):'<div class="empty">Todavía no hay pedidos de esta clase.</div>';
 return h+`<button class="cta" onclick="tRefresh()">Actualizar</button>`};
 
-const TABS=[['pedidos','Pedidos'],['hucha','Hucha'],['historial','Historial'],['clases','Clases'],['ajustes','Ajustes']];
+V.info=()=>`<h2 style="margin-top:14px;font-size:22px">Cómo funciona</h2>
+<p class="sub">Esta app sirve para apuntar los pedidos de turrón y otros productos del viaje del Camino de Santiago y ver cuánto dinero llevamos recaudado.</p>
+<h2>Para los alumnos</h2>
+<ol class="gl">
+<li><b>Instala la app.</b> Ábrela en Safari (iPhone) o Chrome (Android), pulsa Compartir o el menú y elige «Añadir a pantalla de inicio». Entra siempre desde ese icono.</li>
+<li><b>Pon tu nombre y tu clase.</b> Ve a Ajustes. Debajo de la contraseña, en «Alumno», escribe tu nombre y elige 3º A, 3º B, 3º C o PDC. No necesitas contraseña. Solo se hace una vez.</li>
+<li><b>Haz un pedido.</b> En Pedidos elige los productos con + y −, escribe para quién es y pulsa Finalizar. El pedido queda guardado en Historial y, si has puesto tu nombre y clase, se envía a los profesores.</li>
+<li><b>Sigue el pedido en Historial.</b> Gris: pedido hecho. Naranja: recibido. Verde: pagado. Puedes filtrar por estado.</li>
+<li><b>Marca lo que te llega.</b> Abre el pedido y usa − y + para indicar cuántas unidades de cada producto has recibido. Lo que falta aparece en rojo. Con todo recibido, el pedido pasa a naranja.</li>
+<li><b>Cobra y marca Pagado.</b> Cuando te paguen, pulsa «Pagado». El pedido se pone verde y su ganancia se suma a la Hucha. Si te equivocas, usa «Deshacer pago».</li>
+<li><b>Manda el pedido por WhatsApp.</b> Dentro del pedido, «Compartir pedido» crea una imagen con el contenido, para quién es y el total.</li>
+<li><b>Mira la Hucha.</b> En Hucha ves el dinero recaudado, lo que falta para el objetivo y la ganancia por proveedor.</li>
+</ol>
+<h2>Para los profesores</h2>
+<ol class="gl">
+<li>Ve a la pestaña <b>Clases</b> y escribe la contraseña de profesores.</li>
+<li>Elige una de las cuatro clases. Verás el <b>material por preparar</b> (suma de productos) y los pedidos de cada alumno.</li>
+<li>Cuando un pedido esté listo, pulsa «Marcar como preparado». Pulsa «Actualizar» para ver los pedidos nuevos; también se refresca solo.</li>
+</ol>
+<h2>Importante</h2>
+<ol class="gl">
+<li>Los pedidos se guardan en el móvil de cada alumno. No borres los datos del navegador ni desinstales la app.</li>
+<li>Usa siempre el mismo navegador o el icono de la pantalla de inicio. Si usas otro, verás la app vacía.</li>
+<li>Haz de vez en cuando una copia de seguridad: en Hucha o Historial, abajo, pulsa «Exportar copia». Para recuperarla, «Importar copia».</li>
+<li>Si no tienes conexión, el pedido se guarda y se envía a los profesores cuando vuelva internet.</li>
+<li>Los pedidos enviados a los profesores viajan cifrados. Solo se pueden leer con su contraseña.</li>
+</ol>
+<h2>Sugerencias o errores</h2>
+<p class="sub">Si algo no funciona o tienes ideas para mejorar la app, escribe a:</p>
+<a class="cta mail" href="mailto:onthewaycemfs@gmail.com?subject=On%20the%20way%3A%20sugerencia%20o%20error">onthewaycemfs@gmail.com</a>
+<p class="sub" style="margin-top:10px">Cuéntanos qué estabas haciendo y qué móvil usas.</p>`;
+const TABS=[['pedidos','Pedidos'],['hucha','Hucha'],['historial','Historial'],['clases','Clases'],['info','Info'],['ajustes','Ajustes']];
 function render(){const T=tot();
 $('#hb').textContent=eur(T.paid)+' / '+eur(S.goal);$('#hf').style.width=pct()+'%';
 $('#nav').innerHTML=TABS.map(t=>`<button class="${S.tab===t[0]?'on':''}" onclick="tab('${t[0]}')">${t[1]}</button>`).join('');
