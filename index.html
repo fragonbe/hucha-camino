@@ -203,7 +203,7 @@ function delP(id){if(!confirm('¿Borrar este producto y todas sus ventas?'))retu
 function setGoal(v){S.goal=Math.max(1,num(v)||600);save();render()}
 function setTrip(v){S.trip=v;save();render()}
 function reset(){if(confirm('Se borrarán todas las ventas, los pedidos y las celebraciones. ¿Seguro?')){S.sales=[];S.orders=[];S.open=null;S.cel=[];save();render()}}
-function tab(t){if(t!=='ajustes')UNL=false;if(t!=='clases'){TU=false;TTK='';TPW='';TD=null;TC=''}S.tab=t;S.open=null;save();render();window.scrollTo(0,0)}
+function tab(t){if(t!=='ajustes')UNL=false;if(t!=='clases'){TU=false;TPR=null;TD=null;TC=''}S.tab=t;S.open=null;save();render();window.scrollTo(0,0)}
 function sha256(str){const rr=(v,a)=>(v>>>a)|(v<<(32-a));const K=[],H=[],isP={};let pc=0;
 for(let c=2;pc<64;c++){if(!isP[c]){for(let i=0;i<313;i+=c)isP[i]=c;H[pc]=(Math.pow(c,.5)*4294967296)|0;K[pc++]=(Math.pow(c,1/3)*4294967296)|0}}
 const hh=H.slice(0,8);const by=Array.from(new TextEncoder().encode(str));const bl=by.length*8;by.push(0x80);while(by.length%64!==56)by.push(0);
@@ -383,44 +383,68 @@ S.products.forEach(p=>{h+=`<div class="ed"><div class="full"><b>${esc(p.name)}</
 h+=ME();return h+`<button class="cta" onclick="addP()">Añadir producto</button><button class="cta" style="border-color:var(--bad);color:var(--bad)" onclick="reset()">Borrar todas las ventas</button>`};
 
 
-/* ===== Pedidos compartidos con los profesores (Firebase Firestore, REST) ===== */
-const FB={key:'AIzaSyCHAR9gxcwWdSozF-S4vpjB37noLwJAXOk',proj:'ontheway-429c5'},TEMAIL='dargonalb@gmail.com',CLS=['3A','3B','3C','PDC'],CLN={'3A':'3º A','3B':'3º B','3C':'3º C','PDC':'PDC'};
+/* ===== Pedidos compartidos con los profesores (Firebase Firestore, REST, sin cuentas) =====
+   Cada pedido se cifra en el móvil del alumno con una clave pública (ECDH P-256 + AES-GCM).
+   Solo quien conoce la contraseña de profesores puede derivar la clave privada y leerlos. */
+const FB={key:'AIzaSyCHAR9gxcwWdSozF-S4vpjB37noLwJAXOk',proj:'ontheway-429c5'},CLS=['3A','3B','3C','PDC'],CLN={'3A':'3º A','3B':'3º B','3C':'3º C','PDC':'PDC'};
+const TPUB={x:'TYsFz0W-keS7b6LhAZsob3nZ30b5PW9oWQJARZ7ohHc',y:'-owHzjIm3g0JY7baKBueS3rrrm1Xpv8Sj0rEHgPTXp4'},ECP={name:'ECDH',namedCurve:'P-256'};
 const FBU=()=>'https://firestore.googleapis.com/v1/projects/'+FB.proj+'/databases/(default)/documents';
 const ff=o=>{const r={};for(const k in o)r[k]=fv(o[k]);return r};
-const fv=v=>typeof v==='string'?{stringValue:v}:typeof v==='boolean'?{booleanValue:v}:typeof v==='number'?(Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v}):Array.isArray(v)?{arrayValue:{values:v.map(fv)}}:{mapValue:{fields:ff(v)}};
-const uf=f=>{const r={};for(const k in f)r[k]=uv(f[k]);return r};
-const uv=v=>'stringValue' in v?v.stringValue:'integerValue' in v?+v.integerValue:'doubleValue' in v?v.doubleValue:'booleanValue' in v?v.booleanValue:'arrayValue' in v?(v.arrayValue.values||[]).map(uv):'mapValue' in v?uf(v.mapValue.fields||{}):null;
+const fv=v=>typeof v==='string'?{stringValue:v}:typeof v==='boolean'?{booleanValue:v}:{integerValue:String(v)};
 const JH={'Content-Type':'application/json'};
+const SUB=()=>window.crypto&&crypto.subtle;
+const b64=u=>{let s='';new Uint8Array(u).forEach(c=>s+=String.fromCharCode(c));return btoa(s)};
+const unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+const b64u=u=>b64(u).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const aesFrom=async bits=>crypto.subtle.importKey('raw',await crypto.subtle.digest('SHA-256',bits),'AES-GCM',false,['encrypt','decrypt']);
+async function encOrder(obj){
+const eph=await crypto.subtle.generateKey(ECP,true,['deriveBits']);
+const pub=await crypto.subtle.importKey('jwk',{kty:'EC',crv:'P-256',x:TPUB.x,y:TPUB.y,ext:true},ECP,false,[]);
+const key=await aesFrom(await crypto.subtle.deriveBits({name:'ECDH',public:pub},eph.privateKey,256));
+const iv=crypto.getRandomValues(new Uint8Array(12));
+const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(JSON.stringify(obj))));
+const buf=new Uint8Array(12+ct.length);buf.set(iv);buf.set(ct,12);
+return{epk:b64(await crypto.subtle.exportKey('raw',eph.publicKey)),ct:b64(buf)}}
+const ECN=BigInt('0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551');
+async function tKey(pw){const km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']);
+const bits=new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:new TextEncoder().encode('ontheway-aula-v1'),iterations:150000},km,256));
+let d=0n;bits.forEach(x=>d=(d<<8n)|BigInt(x));d=d%ECN;const h=d.toString(16).padStart(64,'0'),db=new Uint8Array(32);for(let i=0;i<32;i++)db[i]=parseInt(h.substr(i*2,2),16);
+return crypto.subtle.importKey('jwk',{kty:'EC',crv:'P-256',x:TPUB.x,y:TPUB.y,d:b64u(db),ext:true},ECP,false,['deriveBits'])}
+async function decOrder(priv,o){const epk=await crypto.subtle.importKey('raw',unb64(o.epk),ECP,false,[]);
+const key=await aesFrom(await crypto.subtle.deriveBits({name:'ECDH',public:epk},priv,256));const b=unb64(o.ct);
+return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b.slice(0,12)},key,b.slice(12))))}
 let FL=false;
-async function flush(){if(FL||!FB.proj||!S.out||!S.out.length)return;FL=true;let n=0;
-try{for(const p of S.out.slice()){let r;try{r=await fetch(FBU()+'/pedidos?documentId='+encodeURIComponent(p.id)+'&key='+FB.key,{method:'POST',headers:JH,body:JSON.stringify({fields:ff(p)})})}catch(e){break}
+async function flush(){if(FL||!FB.proj||!S.out||!S.out.length||!SUB())return;FL=true;let n=0;
+try{for(const p of S.out.slice()){let r;try{const e=await encOrder({alumno:p.alumno,para:p.para,total:p.total,items:p.items});
+r=await fetch(FBU()+'/pedidos?documentId='+encodeURIComponent(p.id)+'&key='+FB.key,{method:'POST',headers:JH,body:JSON.stringify({fields:ff({id:p.id,clase:p.clase,d:p.d,prep:false,epk:e.epk,ct:e.ct})})})}catch(e){break}
 if(r.ok||r.status===409){S.out=S.out.filter(x=>x.id!==p.id);const o=O(p.id);if(o)o.sent=true;save();n++}else break}}finally{FL=false}
 if(n){toast(n>1?'Pedidos enviados a los profesores':'Pedido enviado a los profesores');if(S.tab==='historial')render()}}
 window.addEventListener('online',flush);setTimeout(flush,1500);setInterval(flush,60000);
 function setMeName(v){S.me.name=v.trim().slice(0,60);save();const e=$('#mst');if(e)e.textContent=meTxt()}
 function setMeCls(c){S.me.cls=c;save();render()}
-const meTxt=()=>S.me.name&&S.me.cls?'Pedidos de '+S.me.name+' ('+CLN[S.me.cls]+').':'Falta el nombre o la clase: los pedidos se quedarán solo en este móvil.';
+const meTxt=()=>(S.me.name&&S.me.cls?'Pedidos de '+S.me.name+' ('+CLN[S.me.cls]+').':'Falta el nombre o la clase: los pedidos se quedarán solo en este móvil.')+(SUB()?'':' Este dispositivo no permite enviar pedidos cifrados; usa la web en Safari.');
 const ME=()=>`<h2>Alumno</h2><p class="sub">Pon tu nombre y tu clase para que tus pedidos lleguen a los profesores.</p>
 <div class="ed"><div class="full"><label for="mn">Nombre del alumno</label><input id="mn" type="text" value="${esc(S.me.name)}" maxlength="60" autocomplete="off" oninput="setMeName(this.value)"></div></div>
 <div class="chips">${CLS.map(c=>`<button class="chip ${S.me.cls===c?'on':''}" onclick="setMeCls('${c}')">${CLN[c]}</button>`).join('')}</div>
 <p class="sub" id="mst" style="margin-top:8px">${esc(meTxt())}</p>`;
 /* Profesores */
-let TU=false,TTK='',TPW='',TD=null,TC='',TERR='';
-async function tSign(pw){const r=await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+FB.key,{method:'POST',headers:JH,body:JSON.stringify({email:TEMAIL,password:pw,returnSecureToken:true})});if(!r.ok)throw new Error('auth');TTK=(await r.json()).idToken}
-async function tFetch(url,opt){for(let a=0;a<2;a++){const r=await fetch(url,Object.assign({},opt,{headers:Object.assign({Authorization:'Bearer '+TTK},JH)}));if((r.status===401||r.status===403)&&a===0){await tSign(TPW);continue}if(!r.ok)throw new Error('http'+r.status);return r}}
-async function tLoad(){const r=await tFetch(FBU()+':runQuery?key='+FB.key,{method:'POST',body:JSON.stringify({structuredQuery:{from:[{collectionId:'pedidos'}]}})});
-const j=await r.json();TD=j.filter(x=>x.document).map(x=>uf(x.document.fields));TD.sort((a,b)=>a.d<b.d?1:-1);TERR=''}
+let TU=false,TPR=null,TD=null,TC='',TERR='';
+async function tLoad(){const r=await fetch(FBU()+':runQuery?key='+FB.key,{method:'POST',headers:JH,body:JSON.stringify({structuredQuery:{from:[{collectionId:'pedidos'}]}})});
+if(!r.ok)throw new Error('http'+r.status);const j=await r.json(),out=[];
+for(const x of j){if(!x.document)continue;const f=x.document.fields,g=k=>f[k]&&(f[k].stringValue!==undefined?f[k].stringValue:f[k].booleanValue);
+if(!g('ct')||!g('epk'))continue;try{const o=await decOrder(TPR,{epk:g('epk'),ct:g('ct')});out.push(Object.assign(o,{id:g('id'),clase:g('clase'),d:g('d'),prep:!!g('prep')}))}catch(e){}}
+out.sort((a,b)=>a.d<b.d?1:-1);TD=out;TERR=''}
 async function tTry(){const e=$('#tpw'),m=$('#tpe');
 if(sha256(e.value)!==PWH){e.value='';m.textContent='Contraseña incorrecta';e.focus();return}
-if(!FB.proj){m.textContent='El servidor todavía no está configurado.';return}
-m.textContent='Entrando…';TPW=e.value;
-try{await tSign(TPW)}catch(x){TPW='';m.textContent=navigator.onLine?'El servidor no ha aceptado la contraseña.':'Sin conexión.';return}
-TU=true;try{await tLoad()}catch(x){TERR='No se pudieron cargar los pedidos.'}
+if(!SUB()){m.textContent='Este dispositivo no permite leer pedidos cifrados; usa la web en Safari o Chrome.';return}
+m.textContent='Entrando…';
+try{TPR=await tKey(e.value)}catch(x){m.textContent='No se pudo preparar la clave.';return}
+TU=true;try{await tLoad()}catch(x){TERR='No se pudieron cargar los pedidos (¿sin conexión?).'}
 render();window.scrollTo(0,0)}
-async function tRefresh(){try{await tLoad()}catch(x){TERR='No se pudieron cargar los pedidos.'}if(TU&&S.tab==='clases')render()}
+async function tRefresh(){try{await tLoad()}catch(x){TERR='No se pudieron cargar los pedidos (¿sin conexión?).'}if(TU&&S.tab==='clases')render()}
 function tSel(c){TC=c;render();window.scrollTo(0,0)}
 async function tPrep(id){const d=(TD||[]).find(x=>x.id===id);if(!d)return;const v=!d.prep;
-try{await tFetch(FBU()+'/pedidos/'+encodeURIComponent(id)+'?updateMask.fieldPaths=prep&key='+FB.key,{method:'PATCH',body:JSON.stringify({fields:{prep:{booleanValue:v}}})});d.prep=v;render()}catch(e){toast('No se pudo guardar el cambio')}}
+try{const r=await fetch(FBU()+'/pedidos/'+encodeURIComponent(id)+'?updateMask.fieldPaths=prep&key='+FB.key,{method:'PATCH',headers:JH,body:JSON.stringify({fields:{prep:{booleanValue:v}}})});if(!r.ok)throw 0;d.prep=v;render()}catch(e){toast('No se pudo guardar el cambio')}}
 setInterval(()=>{if(TU&&S.tab==='clases')tRefresh()},30000);
 V.clases=()=>{if(!TU)return `<h2 style="margin-top:14px;font-size:22px">Clases</h2><p class="sub">Solo para profesores. Introduce la contraseña.</p>
 <div class="ed"><div class="full"><label for="tpw">Contraseña</label><input id="tpw" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')tTry()"></div></div>
