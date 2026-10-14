@@ -69,6 +69,8 @@ button{font:inherit;cursor:pointer;color:var(--ink)}
 .pm.plus{background:var(--acc);border-color:var(--acc);color:#1f2b2e}
 .pm:active{transform:scale(.94)}
 .mat .n b{font-size:19px}.mat .n small{font-size:15px;font-weight:600}
+.mat .tot{font-size:30px;font-weight:800;line-height:1}
+.ord .mat{margin-top:8px}.ord.fin{background:color-mix(in srgb,var(--c3) 14%,var(--card))}
 .mat .ctl{gap:10px}.mat .ctl span{font-size:36px;min-width:56px;line-height:1}
 .mat .pm{width:54px;height:54px;font-size:30px}
 .mat.pend{background:color-mix(in srgb,var(--acc) 38%,var(--card));border:2px solid var(--acc)}
@@ -173,7 +175,7 @@ if(!S.trip)S.trip='2027-04-06';
 if(!S.orders)S.orders=[];if(!['todos','pedido','recibido','pagado'].includes(S.filter))S.filter='todos';if(S.open===undefined)S.open=null;
 if(!['pedidos','hucha','historial','ajustes','clases','info'].includes(S.tab))S.tab='pedidos';
 if(!S.draft)S.draft={name:'',q:{}};
-if(!S.me)S.me={name:'',cls:''};if(!S.out)S.out=[];if(!S.del)S.del=[];if(!S.tc)S.tc={};
+if(!S.me)S.me={name:'',cls:''};if(!S.out)S.out=[];if(!S.del)S.del=[];if(!S.tp)S.tp={};
 S.orders.forEach(o=>o.items.forEach(i=>{if('got' in i){i.rec=i.got?i.qty:0;delete i.got}}));
 S.orders.forEach(o=>{if('delivered' in o){o.paid=!!o.delivered;delete o.delivered;delete o.dd}});
 const save=()=>{const j=JSON.stringify(S);try{localStorage.setItem(KEY,j)}catch(e){}try{IDB.put(j)}catch(e){}};
@@ -459,10 +461,10 @@ async function tRefresh(){try{await tLoad()}catch(x){TERR='No se pudieron cargar
 function tSel(c){TC=c;render();window.scrollTo(0,0);tRefresh()}
 async function tPrep(id){const d=(TD||[]).find(x=>x.id===id);if(!d)return;const v=!d.prep;
 try{const r=await fetch(FBU()+'/pedidos/'+encodeURIComponent(id)+'?updateMask.fieldPaths=prep&key='+FB.key,{method:'PATCH',headers:JH,body:JSON.stringify({fields:{prep:{booleanValue:v}}})});if(!r.ok)throw 0;d.prep=v;render()}catch(e){toast('No se pudo guardar el cambio')}}
-function tMat(c){const m={};(TD||[]).filter(x=>x.clase===c&&!x.prep).forEach(x=>x.items.forEach(i=>{m[i.name]=(m[i.name]||0)+i.qty}));return m}
-const tcv=(c,k,mx)=>Math.min(mx,((S.tc||{})[c]||{})[k]||0);
-function tcq(k,d){const m=tMat(TC),ks=Object.keys(m);const nm=ks[k];if(nm===undefined)return;const mx=m[nm];let n=tcv(TC,nm,mx)+d;if(n<0)n=mx;if(n>mx)n=mx;S.tc=S.tc||{};(S.tc[TC]=S.tc[TC]||{})[nm]=n;save();render()}
-function tcDone(){S.tc=S.tc||{};S.tc[TC]={};save();render();toast('Contadores reiniciados')}
+const tpv=(o,k)=>Math.min(o.items[k].qty,((S.tp||{})[o.id]||[])[k]||0);
+const tpAll=o=>o.items.every((i,k)=>tpv(o,k)>=i.qty);
+function tpq(id,k,d){const o=(TD||[]).find(x=>x.id===id);if(!o||o.prep)return;const mx=o.items[k].qty;let n=tpv(o,k)+d;if(n<0)n=mx;if(n>mx)n=mx;S.tp=S.tp||{};const a=S.tp[id]=S.tp[id]||[];a[k]=n;save();render()}
+function tReopen(id){if(S.tp)delete S.tp[id];save();tPrep(id)}
 async function tDel(id){const d=(TD||[]).find(x=>x.id===id);if(!d)return;
 if(!confirm('¿Borrar el pedido de '+d.alumno+'? Desaparecerá para todos los profesores.'))return;
 if(!confirm('Segunda confirmación: el pedido de '+d.alumno+' se borrará definitivamente y no se puede recuperar. ¿Borrarlo?'))return;
@@ -475,11 +477,13 @@ V.clases=()=>{if(!TU)return `<h2 style="margin-top:14px;font-size:22px">Clases</
 const D=TD||[];const by=c=>D.filter(x=>x.clase===c);
 const err=TERR?`<p class="lack" role="alert">${esc(TERR)}</p>`:'';
 if(!TC){return `<h2 style="margin-top:14px;font-size:22px">Clases</h2><p class="sub">Elige una clase para ver los pedidos de sus alumnos.</p>${err}`+CLS.map(c=>{const L=by(c),np=L.filter(x=>!x.prep).length;return `<button class="cta" style="text-align:left;padding:16px" onclick="tSel('${c}')"><b style="font-size:19px">${CLN[c]}</b><br><small style="font-weight:500">${L.length} pedido${L.length===1?'':'s'}${np?' · '+np+' por preparar':L.length?' · todo preparado':''}</small></button>`}).join('')+`<button class="cta" onclick="tRefresh()">Actualizar</button>`}
-const L=by(TC),P0=L.filter(x=>!x.prep);const m={};P0.forEach(x=>x.items.forEach(i=>{m[i.name]=(m[i.name]||0)+i.qty}));
+const L=by(TC),P0=L.filter(x=>!x.prep),PF=L.filter(x=>x.prep);const m={};P0.forEach(x=>x.items.forEach(i=>{m[i.name]=(m[i.name]||0)+i.qty}));
 let h=`<button class="back" onclick="tSel('')">← Clases</button><h2>${CLN[TC]}</h2>${err}<h2>Material por preparar</h2>`;
-const ks=Object.keys(m);h+=ks.length?ks.map((k,j)=>{const v=tcv(TC,k,m[k]);return `<div class="row mat${v<m[k]?' pend':' done'}"><div class="n"><b>${esc(k)}</b><small>Total: ${m[k]} ud.</small></div><div class="ctl"><button class="pm" aria-label="Una menos de ${esc(k)}" onclick="tcq(${j},-1)">−</button><span aria-label="Preparadas">${v}</span><button class="pm plus" aria-label="Una más de ${esc(k)}" onclick="tcq(${j},1)">+</button></div></div>`}).join('')+(ks.every(k=>tcv(TC,k,m[k])>=m[k])?'<button class="cta ok" onclick="tcDone()">Listo</button>':''):'<div class="empty">No hay material pendiente.</div>';
+const ks=Object.keys(m);h+=ks.length?ks.map(k=>`<div class="row mat"><div class="n"><b>${esc(k)}</b></div><span class="tot">${m[k]} ud.</span></div>`).join(''):'<div class="empty">No hay material pendiente.</div>';
+const trash=x=>`<button class="trash" aria-label="Borrar pedido de ${esc(x.alumno)}" title="Borrar pedido" onclick="tDel('${x.id}')">🗑</button>`;
 h+='<h2>Pedidos</h2>';
-h+=L.length?L.map(x=>`<div class="ord s${x.prep?2:0}" style="position:relative"><button class="trash" aria-label="Borrar pedido de ${esc(x.alumno)}" title="Borrar pedido" onclick="tDel('${x.id}')">🗑</button><div class="l1" style="padding-right:38px"><b>${esc(x.alumno)}</b><span class="stt">${x.prep?'Preparado':'Por preparar'}</span></div><small>Para: ${esc(x.para)} · ${dfmt(x.d)} · ${eur(x.total)}</small><div style="margin-top:6px;font-size:14.5px">${x.items.map(i=>esc(i.name)+' × '+i.qty).join('<br>')}</div><button class="sm" style="margin-top:8px" onclick="tPrep('${x.id}')">${x.prep?'Marcar como no preparado':'Marcar como preparado'}</button></div>`).join(''):'<div class="empty">Todavía no hay pedidos de esta clase.</div>';
+h+=P0.length?P0.map(x=>`<div class="ord s0" style="position:relative">${trash(x)}<div class="l1" style="padding-right:38px"><b>${esc(x.alumno)}</b><span class="stt">Por preparar</span></div><small>Para: ${esc(x.para)} · ${dfmt(x.d)} · ${eur(x.total)}</small>`+x.items.map((i,k)=>{const v=tpv(x,k);return `<div class="row mat ${v<i.qty?'pend':'done'}"><div class="n"><b>${esc(i.name)}</b><small>Pedidas: ${i.qty}</small></div><div class="ctl"><button class="pm" aria-label="Una menos de ${esc(i.name)}" onclick="tpq('${x.id}',${k},-1)">−</button><span aria-label="Preparadas">${v}</span><button class="pm plus" aria-label="Una más de ${esc(i.name)}" onclick="tpq('${x.id}',${k},1)">+</button></div></div>`}).join('')+(tpAll(x)?`<button class="cta ok" style="margin-top:10px" onclick="tPrep('${x.id}')">Finalizado</button>`:'')+'</div>').join(''):'<div class="empty">No hay pedidos pendientes en esta clase.</div>';
+if(PF.length){h+='<h2>Finalizados</h2>'+PF.map(x=>`<div class="ord s2 fin" style="position:relative">${trash(x)}<div class="l1" style="padding-right:38px"><b>${esc(x.alumno)}</b><span class="stt">Finalizado</span></div><small>Para: ${esc(x.para)} · ${dfmt(x.d)} · ${eur(x.total)}</small><div style="margin-top:6px;font-size:14.5px">${x.items.map(i=>esc(i.name)+' × '+i.qty).join('<br>')}</div><button class="sm" style="margin-top:8px" onclick="tReopen('${x.id}')">Reabrir</button></div>`).join('')}
 return h+`<button class="cta" onclick="tRefresh()">Actualizar</button>`};
 
 V.info=()=>`<h2 style="margin-top:14px;font-size:22px">Cómo funciona</h2>
