@@ -384,7 +384,7 @@ h+=ME();return h+`<button class="cta" onclick="addP()">Añadir producto</button>
 
 
 /* ===== Pedidos compartidos con los profesores (Firebase Firestore, REST) ===== */
-const FB={key:'AIzaSyCHAR9gxcwWdSozF-S4vpjB37noLwJAXOk',proj:'ontheway-429c5'},TEMAIL='profes@ontheway.app',CLS=['3A','3B','3C','PDC'],CLN={'3A':'3º A','3B':'3º B','3C':'3º C','PDC':'PDC'};
+const FB={key:'AIzaSyCHAR9gxcwWdSozF-S4vpjB37noLwJAXOk',proj:'ontheway-429c5'},TEMAIL='dargonalb@gmail.com',CLS=['3A','3B','3C','PDC'],CLN={'3A':'3º A','3B':'3º B','3C':'3º C','PDC':'PDC'};
 const FBU=()=>'https://firestore.googleapis.com/v1/projects/'+FB.proj+'/databases/(default)/documents';
 const ff=o=>{const r={};for(const k in o)r[k]=fv(o[k]);return r};
 const fv=v=>typeof v==='string'?{stringValue:v}:typeof v==='boolean'?{booleanValue:v}:typeof v==='number'?(Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v}):Array.isArray(v)?{arrayValue:{values:v.map(fv)}}:{mapValue:{fields:ff(v)}};
