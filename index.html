@@ -227,7 +227,7 @@ for(let i=0;i<64;i++){const S1=rr(e,6)^rr(e,11)^rr(e,25),ch=(e&f)^(~e&g),t1=(h+S
 h=g;g=f;f=e;e=(d+t1)|0;d=c;c=b;b=a;a=(t1+t2)|0}
 hh[0]=(hh[0]+a)|0;hh[1]=(hh[1]+b)|0;hh[2]=(hh[2]+c)|0;hh[3]=(hh[3]+d)|0;hh[4]=(hh[4]+e)|0;hh[5]=(hh[5]+f)|0;hh[6]=(hh[6]+g)|0;hh[7]=(hh[7]+h)|0}
 return hh.map(x=>('00000000'+(x>>>0).toString(16)).slice(-8)).join('')}
-const PWH='8508646ae329d266395598213e93d3bbb110bdecbe0c54463f1ffff2c721a0fd';let UNL=false;
+const PWH='51a682494e9ca8d29380c2999da35347dede787c4c3ce5006442dbec1ca2434c';let UNL=false;
 const npw=v=>String(v).normalize('NFKC').trim().toLowerCase();
 function tryPw(){const e=$('#pw');if(sha256(npw(e.value))===PWH){UNL=true;render();window.scrollTo(0,0)}else{e.value='';const m=$('#pwe');m.textContent='Contraseña incorrecta';e.focus()}}
 
@@ -402,7 +402,7 @@ h+=ME();return h+`<button class="cta" onclick="addP()">Añadir producto</button>
    Cada pedido se cifra en el móvil del alumno con una clave pública (ECDH P-256 + AES-GCM).
    Solo quien conoce la contraseña de profesores puede derivar la clave privada y leerlos. */
 const FB={key:'AIzaSyCHAR9gxcwWdSozF-S4vpjB37noLwJAXOk',proj:'ontheway-429c5'},CLS=['3A','3B','3C','PDC'],CLN={'3A':'3º A','3B':'3º B','3C':'3º C','PDC':'PDC'};
-const TPUB={x:'TYsFz0W-keS7b6LhAZsob3nZ30b5PW9oWQJARZ7ohHc',y:'-owHzjIm3g0JY7baKBueS3rrrm1Xpv8Sj0rEHgPTXp4'},ECP={name:'ECDH',namedCurve:'P-256'};
+const TPUB={x:'04N1V2cIjxbwV9vBbCtRhTj701v_ZGUhi7g9UMGp6VU',y:'qaDrKsfQQoOA8k18OXyc5lBNHQEicRoM7qc-hQqscX8'},ECP={name:'ECDH',namedCurve:'P-256'};
 const FBU=()=>'https://firestore.googleapis.com/v1/projects/'+FB.proj+'/databases/(default)/documents';
 const ff=o=>{const r={};for(const k in o)r[k]=fv(o[k]);return r};
 const fv=v=>typeof v==='string'?{stringValue:v}:typeof v==='boolean'?{booleanValue:v}:{integerValue:String(v)};
