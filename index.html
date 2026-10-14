@@ -68,6 +68,11 @@ button{font:inherit;cursor:pointer;color:var(--ink)}
 .pm{width:46px;height:46px;border-radius:12px;border:2px solid var(--ink);background:var(--card);font-size:26px;line-height:1;font-weight:700}
 .pm.plus{background:var(--acc);border-color:var(--acc);color:#1f2b2e}
 .pm:active{transform:scale(.94)}
+.mat .n b{font-size:19px}.mat .n small{font-size:15px;font-weight:600}
+.mat .ctl{gap:10px}.mat .ctl span{font-size:36px;min-width:56px;line-height:1}
+.mat .pm{width:54px;height:54px;font-size:30px}
+.mat.pend{background:color-mix(in srgb,var(--acc) 38%,var(--card));border:2px solid var(--acc)}
+.mat.done{background:color-mix(in srgb,var(--c3) 14%,var(--card));border-color:var(--c3)}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 .sw{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:12px}
 .sw.on{border-color:var(--acc);box-shadow:inset 0 0 0 2px var(--acc)}
@@ -472,7 +477,7 @@ const err=TERR?`<p class="lack" role="alert">${esc(TERR)}</p>`:'';
 if(!TC){return `<h2 style="margin-top:14px;font-size:22px">Clases</h2><p class="sub">Elige una clase para ver los pedidos de sus alumnos.</p>${err}`+CLS.map(c=>{const L=by(c),np=L.filter(x=>!x.prep).length;return `<button class="cta" style="text-align:left;padding:16px" onclick="tSel('${c}')"><b style="font-size:19px">${CLN[c]}</b><br><small style="font-weight:500">${L.length} pedido${L.length===1?'':'s'}${np?' · '+np+' por preparar':L.length?' · todo preparado':''}</small></button>`}).join('')+`<button class="cta" onclick="tRefresh()">Actualizar</button>`}
 const L=by(TC),P0=L.filter(x=>!x.prep);const m={};P0.forEach(x=>x.items.forEach(i=>{m[i.name]=(m[i.name]||0)+i.qty}));
 let h=`<button class="back" onclick="tSel('')">← Clases</button><h2>${CLN[TC]}</h2>${err}<h2>Material por preparar</h2>`;
-const ks=Object.keys(m);h+=ks.length?ks.map((k,j)=>{const v=tcv(TC,k,m[k]);return `<div class="row${v<m[k]?'':' ok'}"><div class="n"><b>${esc(k)}</b><small>Total: ${m[k]} ud.</small></div><div class="ctl"><button class="pm" aria-label="Una menos de ${esc(k)}" onclick="tcq(${j},-1)">−</button><span aria-label="Preparadas">${v}</span><button class="pm plus" aria-label="Una más de ${esc(k)}" onclick="tcq(${j},1)">+</button></div></div>`}).join('')+(ks.every(k=>tcv(TC,k,m[k])>=m[k])?'<button class="cta ok" onclick="tcDone()">Listo</button>':''):'<div class="empty">No hay material pendiente.</div>';
+const ks=Object.keys(m);h+=ks.length?ks.map((k,j)=>{const v=tcv(TC,k,m[k]);return `<div class="row mat${v<m[k]?' pend':' done'}"><div class="n"><b>${esc(k)}</b><small>Total: ${m[k]} ud.</small></div><div class="ctl"><button class="pm" aria-label="Una menos de ${esc(k)}" onclick="tcq(${j},-1)">−</button><span aria-label="Preparadas">${v}</span><button class="pm plus" aria-label="Una más de ${esc(k)}" onclick="tcq(${j},1)">+</button></div></div>`}).join('')+(ks.every(k=>tcv(TC,k,m[k])>=m[k])?'<button class="cta ok" onclick="tcDone()">Listo</button>':''):'<div class="empty">No hay material pendiente.</div>';
 h+='<h2>Pedidos</h2>';
 h+=L.length?L.map(x=>`<div class="ord s${x.prep?2:0}" style="position:relative"><button class="trash" aria-label="Borrar pedido de ${esc(x.alumno)}" title="Borrar pedido" onclick="tDel('${x.id}')">🗑</button><div class="l1" style="padding-right:38px"><b>${esc(x.alumno)}</b><span class="stt">${x.prep?'Preparado':'Por preparar'}</span></div><small>Para: ${esc(x.para)} · ${dfmt(x.d)} · ${eur(x.total)}</small><div style="margin-top:6px;font-size:14.5px">${x.items.map(i=>esc(i.name)+' × '+i.qty).join('<br>')}</div><button class="sm" style="margin-top:8px" onclick="tPrep('${x.id}')">${x.prep?'Marcar como no preparado':'Marcar como preparado'}</button></div>`).join(''):'<div class="empty">Todavía no hay pedidos de esta clase.</div>';
 return h+`<button class="cta" onclick="tRefresh()">Actualizar</button>`};
