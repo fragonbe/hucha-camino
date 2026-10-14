@@ -228,7 +228,8 @@ h=g;g=f;f=e;e=(d+t1)|0;d=c;c=b;b=a;a=(t1+t2)|0}
 hh[0]=(hh[0]+a)|0;hh[1]=(hh[1]+b)|0;hh[2]=(hh[2]+c)|0;hh[3]=(hh[3]+d)|0;hh[4]=(hh[4]+e)|0;hh[5]=(hh[5]+f)|0;hh[6]=(hh[6]+g)|0;hh[7]=(hh[7]+h)|0}
 return hh.map(x=>('00000000'+(x>>>0).toString(16)).slice(-8)).join('')}
 const PWH='8508646ae329d266395598213e93d3bbb110bdecbe0c54463f1ffff2c721a0fd';let UNL=false;
-function tryPw(){const e=$('#pw');if(sha256(e.value)===PWH){UNL=true;render();window.scrollTo(0,0)}else{e.value='';const m=$('#pwe');m.textContent='Contraseña incorrecta';e.focus()}}
+const npw=v=>String(v).normalize('NFKC').trim().toLowerCase();
+function tryPw(){const e=$('#pw');if(sha256(npw(e.value))===PWH){UNL=true;render();window.scrollTo(0,0)}else{e.value='';const m=$('#pwe');m.textContent='Contraseña incorrecta';e.focus()}}
 
 function dq(pid,d){const q=S.draft.q;q[pid]=Math.max(0,(q[pid]||0)+d);if(!q[pid])delete q[pid];save();render()}
 function dName(v){S.draft.name=v;save()}
@@ -451,10 +452,10 @@ for(const x of j){if(!x.document)continue;const f=x.document.fields,g=k=>f[k]&&(
 if(!g('ct')||!g('epk'))continue;try{const o=await decOrder(TPR,{epk:g('epk'),ct:g('ct')});out.push(Object.assign(o,{id:g('id'),clase:g('clase'),d:g('d'),prep:!!g('prep')}))}catch(e){}}
 out.sort((a,b)=>a.d<b.d?1:-1);TD=out;TERR=''}
 async function tTry(){const e=$('#tpw'),m=$('#tpe');
-if(sha256(e.value)!==PWH){e.value='';m.textContent='Contraseña incorrecta';e.focus();return}
+if(sha256(npw(e.value))!==PWH){e.value='';m.textContent='Contraseña incorrecta';e.focus();return}
 if(!SUB()){m.textContent='Este dispositivo no permite leer pedidos cifrados; usa la web en Safari o Chrome.';return}
 m.textContent='Entrando…';
-try{TPR=await tKey(e.value)}catch(x){m.textContent='No se pudo preparar la clave.';return}
+try{TPR=await tKey(npw(e.value))}catch(x){m.textContent='No se pudo preparar la clave.';return}
 TU=true;try{await tLoad()}catch(x){TERR='No se pudieron cargar los pedidos (¿sin conexión?).'}
 render();window.scrollTo(0,0)}
 async function tRefresh(){try{await tLoad()}catch(x){TERR='No se pudieron cargar los pedidos (¿sin conexión?).'}if(TU&&S.tab==='clases')render()}
