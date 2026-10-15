@@ -1,4 +1,4 @@
-const V = 'hucha-v25';
+const V = 'hucha-v26';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -7,7 +7,7 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(ks => Promise.all(ks.filter(k => k !== V).map(k => caches.delete(k))))
+    caches.keys().then(ks => Promise.all(ks.filter(k => k !== V && k.startsWith('hucha-v')).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
