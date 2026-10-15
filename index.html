@@ -383,7 +383,7 @@ lo.forEach(o=>{const st=ostat(o);h+=`<button class="ord s${st}" onclick="openO('
 if(ld.length){h+='<h2>Ventas anteriores</h2>'+ld.map(s=>{const p=P(s.pid);return`<div class="row"><div class="n"><b>${p?esc(p.name):'Producto borrado'}</b><small>${dfmt(s.d)} · ${eur(p?p.sell:0)} · ganas ${eur(gain(s))}</small></div><button class="sm red" aria-label="Borrar venta" onclick="delSale('${s.id}')">Borrar</button></div>`}).join('')}
 return h+BK()};
 
-const foot=()=>'<footer class="ft">Hecho por Darío · 2026</footer>';
+const foot=()=>'<footer class="ft">Hecho por Darío</footer>';
 
 V.ajustes=()=>{if(!UNL)return `<h2 style="margin-top:14px;font-size:22px">Ajustes</h2><p class="sub">Introduce la contraseña para entrar.</p>
 <div class="ed"><div class="full"><label for="pw">Contraseña</label><input id="pw" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')tryPw()"></div></div>
@@ -473,17 +473,20 @@ async function tPartial(id){const o=(TD||[]).find(x=>x.id===id);if(!o||o.prep||!
 const del=[],rest=[];o.items.forEach((i,k)=>{const v=tpv(o,k);if(v>0)del.push({name:i.name,qty:v,price:i.price});if(i.qty-v>0)rest.push({name:i.name,qty:i.qty-v,price:i.price})});
 const L=a=>a.map(f=>f.qty+' × '+f.name).join(', ');
 if(!confirm('ENTREGA PARCIAL a '+o.alumno+'.\nSe entrega: '+L(del)+'.\nQueda pendiente: '+L(rest)+'.\nLo pendiente queda en el pedido y sigue sumando en el material por preparar. ¿Aceptar?'))return;
+let undo=null;
 try{
 const nx=(TD||[]).find(x=>x.clase===o.clase&&x.alumno===o.alumno&&x.para===o.para&&!x.prep&&x.id!==o.id&&x.parcial);
 if(nx){const its=nx.items.map(i=>({name:i.name,qty:i.qty,price:i.price}));rest.forEach(r=>{const f=its.find(i=>i.name===r.name);if(f)f.qty+=r.qty;else its.push(r)});
-const e=await encOrder({alumno:nx.alumno,para:nx.para,total:orTot(its),items:its,parcial:true});await tPatch(nx.id,{epk:{stringValue:e.epk},ct:{stringValue:e.ct}},['epk','ct']);nx.items=its;nx.total=orTot(its)}
+const old=nx.items.map(i=>({name:i.name,qty:i.qty,price:i.price}));const e=await encOrder({alumno:nx.alumno,para:nx.para,total:orTot(its),items:its,parcial:true});await tPatch(nx.id,{epk:{stringValue:e.epk},ct:{stringValue:e.ct}},['epk','ct']);nx.items=its;nx.total=orTot(its);
+undo=async()=>{const eo=await encOrder({alumno:nx.alumno,para:nx.para,total:orTot(old),items:old,parcial:true});await tPatch(nx.id,{epk:{stringValue:eo.epk},ct:{stringValue:eo.ct}},['epk','ct'])}}
 else{const nid2=nid('o'),d2=o.d,e=await encOrder({alumno:o.alumno,para:o.para,total:orTot(rest),items:rest,parcial:true});
 const r=await fetch(FBU()+'/pedidos?documentId='+encodeURIComponent(nid2)+'&key='+FB.key,{method:'POST',headers:JH,body:JSON.stringify({fields:ff({id:nid2,clase:o.clase,d:d2,prep:false,epk:e.epk,ct:e.ct})})});if(!r.ok)throw new Error('create'+r.status);
-TD.push({id:nid2,clase:o.clase,d:d2,prep:false,alumno:o.alumno,para:o.para,total:orTot(rest),items:rest,parcial:true})}
+TD.push({id:nid2,clase:o.clase,d:d2,prep:false,alumno:o.alumno,para:o.para,total:orTot(rest),items:rest,parcial:true});
+undo=async()=>{await fetch(FBU()+'/pedidos/'+encodeURIComponent(nid2)+'?key='+FB.key,{method:'DELETE'})}}
 const e2=await encOrder({alumno:o.alumno,para:o.para,total:orTot(del),items:del});
 await tPatch(id,{prep:{booleanValue:true},epk:{stringValue:e2.epk},ct:{stringValue:e2.ct}},['prep','epk','ct']);
 o.items=del;o.total=orTot(del);o.prep=true;if(S.tp)delete S.tp[id];save();render();toast('Entrega parcial registrada')}
-catch(x){toast('No se pudo registrar la entrega parcial');tRefresh()}}
+catch(x){if(undo){try{await undo()}catch(y){}}toast('No se pudo registrar la entrega parcial');tRefresh()}}
 function tReopen(id){if(S.tp)delete S.tp[id];save();tPrep(id)}
 async function tDel(id){const d=(TD||[]).find(x=>x.id===id);if(!d)return;
 if(!confirm('¿Borrar el pedido de '+d.alumno+'? Desaparecerá para todos los profesores.'))return;
