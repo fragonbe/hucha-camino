@@ -121,6 +121,7 @@ html{-webkit-text-size-adjust:100%}button,label{touch-action:manipulation}.lg{wi
 .s0{--s:var(--sg)}.s1{--s:var(--so)}.s2{--s:var(--sv)}
 .ord{display:block;width:100%;text-align:left;border:1px solid color-mix(in srgb,var(--s) 55%,var(--line));border-left:9px solid var(--s);background:color-mix(in srgb,var(--s) 14%,var(--card));border-radius:12px;padding:10px 12px;margin-top:8px}
 .lk{position:absolute;top:8px;right:46px;display:flex;align-items:center;gap:5px;font-size:13px;font-weight:700;cursor:pointer}.lk input{width:20px;height:20px;margin:0}
+.bkb{margin:12px 0;padding:12px;border-radius:12px;border:2px solid var(--acc);background:color-mix(in srgb,var(--acc) 30%,var(--card))}.bkb b{display:block;font-size:16px}.bkb span{display:block;font-size:14px;margin:4px 0 8px}.bkb div{display:flex;gap:8px;flex-wrap:wrap}
 .trash{position:absolute;top:6px;right:6px;width:32px;height:32px;border:1px solid var(--line);border-radius:8px;background:var(--card);font-size:17px;line-height:1;padding:0;cursor:pointer}
 .ord .l1{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
 .ord b{font-size:16px;font-weight:700}
@@ -305,6 +306,10 @@ try{const file=new File([blob],fname,{type:'image/png'});
 if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Pedido de '+o.name});return}}catch(e){if(e&&e.name==='AbortError')return}
 showImg(cv.toDataURL('image/png'),fname)}
 
+const BKD=7,dago=iso=>Math.max(0,Math.floor((Date.now()-new Date(iso))/864e5));
+function bkBanner(){if(!(S.orders.length||S.sales.length))return '';const l=S.lastBackup,dd=l?dago(l):0;if(l&&dd<BKD)return '';if(S.bkSnooze&&Date.now()<S.bkSnooze)return '';
+return `<div class="bkb" role="alert"><b>Haz una copia de seguridad</b><span>${l?'Hace '+dd+' días que no haces copia de tus datos.':'Todavía no has hecho ninguna copia de tus datos.'} Si se borran los datos del navegador, se pierden.</span><div><button class="sm" onclick="exportData()">Exportar copia</button><button class="sm" onclick="bkLater()">Ahora no</button></div></div>`}
+function bkLater(){S.bkSnooze=Date.now()+864e5;save();render()}
 async function exportData(){S.lastBackup=new Date().toISOString();save();
 const json=JSON.stringify(S,null,1),d=new Date(),pad=n=>String(n).padStart(2,'0');
 const fname='Copia-hucha-'+d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'.json';
@@ -498,6 +503,24 @@ await tPatch(id,{prep:{booleanValue:true},epk:{stringValue:e2.epk},ct:{stringVal
 o.items=del;o.total=orTot(del);o.prep=true;if(S.tp)delete S.tp[id];save();render();toast('Entrega parcial registrada')}
 catch(x){if(undo){try{await undo()}catch(y){}}toast('No se pudo registrar la entrega parcial');tRefresh()}}
 function tReopen(id){if(S.tp)delete S.tp[id];save();tPrep(id)}
+const tbk=()=>{const D=TD||[];if(!D.length)return '';const l=S.lastTBackup,dd=l?dago(l):0;if(l&&dd<BKD)return '';if(S.tbkSnooze&&Date.now()<S.tbkSnooze)return '';
+return `<div class="bkb" role="alert"><b>Exporta los pedidos</b><span>${l?'Hace '+dd+' días que no exportas los pedidos.':'Todavía no has exportado los pedidos.'} Guarda una copia por si se pierde algo.</span><div><button class="sm" onclick="tExport()">Exportar pedidos</button><button class="sm" onclick="tbkLater()">Ahora no</button></div></div>`};
+function tbkLater(){S.tbkSnooze=Date.now()+864e5;save();render()}
+const tbkBtn=()=>`<h2>Copia de seguridad</h2><p class="sub">Descarga los pedidos de todas las clases en un fichero que se abre con Excel. Última exportación: ${S.lastTBackup?dfmt(S.lastTBackup):'nunca'}.</p><button class="cta" onclick="tExport()">Exportar pedidos</button>`;
+async function tExport(){const D=TD||[];if(!D.length){toast('No hay pedidos que exportar');return}
+const q=v=>{v=String(v==null?'':v);if(/^[=+\-@]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'},n2=v=>String(Math.round(v*100)/100).replace('.',','),pad=n=>String(n).padStart(2,'0');
+const df=iso=>{const d=new Date(iso);return isNaN(d)?'':d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())};
+const rows=[['Clase','Alumno','Para','Fecha','Producto','Cantidad','Precio','Importe','Estado','Preparadas','Bloqueado']];
+[...D].sort((a,b)=>CLS.indexOf(a.clase)-CLS.indexOf(b.clase)||(a.d<b.d?-1:1)).forEach(x=>x.items.forEach((i,k)=>rows.push([CLN[x.clase]||x.clase,x.alumno,x.para,df(x.d),i.name,i.qty,n2(i.price),n2(i.qty*i.price),x.prep?'Finalizado':(x.parcial?'Entrega parcial':'Por preparar'),x.prep?i.qty:tpv(x,k),x.lock?'Sí':'No'])));
+const csv='\ufeff'+rows.map(r=>r.map(q).join(';')).join('\r\n'),d=new Date();
+const fname='Pedidos-profesores-'+d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'.csv';
+S.lastTBackup=new Date().toISOString();save();
+const mh=window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.share;
+if(mh){mh.postMessage({data:btoa(unescape(encodeURIComponent(csv))),ext:'csv'});render();return}
+const blob=new Blob([csv],{type:'text/csv'});
+try{const file=new File([blob],fname,{type:'text/csv'});
+if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Pedidos de los profesores'});render();return}}catch(e){if(e&&e.name==='AbortError'){render();return}}
+const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);render()}
 async function tLock(id,v){const d=(TD||[]).find(x=>x.id===id);if(!d)return;try{await tPatch(id,{lock:{booleanValue:v}},['lock']);d.lock=v;toast(v?'Pedido bloqueado: el alumno no puede borrarlo':'Pedido desbloqueado')}catch(e){toast('No se pudo guardar el cambio')}render()}
 async function tDel(id){const d=(TD||[]).find(x=>x.id===id);if(!d)return;if(d.lock){toast('Está bloqueado: desmarca «Bloquear» para poder borrarlo.');return}
 if(!confirm('¿Borrar el pedido de '+d.alumno+'? Desaparecerá para todos los profesores.'))return;
@@ -510,9 +533,9 @@ V.clases=()=>{if(!TU)return `<h2 style="margin-top:14px;font-size:22px">Clases</
 <p id="tpe" class="lack" role="alert" style="margin:8px 0 0;min-height:1.4em"></p><button class="cta ok" onclick="tTry()">Entrar</button>`;
 const D=TD||[];const by=c=>D.filter(x=>x.clase===c);
 const err=TERR?`<p class="lack" role="alert">${esc(TERR)}</p>`:'';
-if(!TC){return `<h2 style="margin-top:14px;font-size:22px">Clases</h2><p class="sub">Elige una clase para ver los pedidos de sus alumnos.</p>${err}`+CLS.map(c=>{const L=by(c),np=L.filter(x=>!x.prep).length;return `<button class="cta" style="text-align:left;padding:16px" onclick="tSel('${c}')"><b style="font-size:19px">${CLN[c]}</b><br><small style="font-weight:500">${L.length} pedido${L.length===1?'':'s'}${np?' · '+np+' por preparar':L.length?' · todo preparado':''}</small></button>`}).join('')+`<button class="cta" onclick="tRefresh()">Actualizar</button>`}
+if(!TC){return `<h2 style="margin-top:14px;font-size:22px">Clases</h2><p class="sub">Elige una clase para ver los pedidos de sus alumnos.</p>${err}${tbk()}`+CLS.map(c=>{const L=by(c),np=L.filter(x=>!x.prep).length;return `<button class="cta" style="text-align:left;padding:16px" onclick="tSel('${c}')"><b style="font-size:19px">${CLN[c]}</b><br><small style="font-weight:500">${L.length} pedido${L.length===1?'':'s'}${np?' · '+np+' por preparar':L.length?' · todo preparado':''}</small></button>`}).join('')+`<button class="cta" onclick="tRefresh()">Actualizar</button>`+tbkBtn()}
 const L=by(TC),P0=L.filter(x=>!x.prep),PF=L.filter(x=>x.prep);const m={};P0.forEach(x=>x.items.forEach((i,k)=>{m[i.name]=(m[i.name]||0)+Math.max(0,i.qty-tpv(x,k))}));
-let h=`<button class="back" onclick="tSel('')">← Clases</button><h2>${CLN[TC]}</h2>${err}<h2>Material por preparar</h2>`;
+let h=`<button class="back" onclick="tSel('')">← Clases</button><h2>${CLN[TC]}</h2>${err}${tbk()}<h2>Material por preparar</h2>`;
 const ks=Object.keys(m);h+=ks.length?ks.map(k=>`<div class="row mat${m[k]?'':' done'}"><div class="n"><b>${esc(k)}</b></div><span class="tot">${m[k]} ud.</span></div>`).join(''):'<div class="empty">No hay material pendiente.</div>';
 const partTxt=x=>{if(!tpPart(x))return '';const r=x.items.map((i,k)=>[i.name,i.qty-tpv(x,k)]).filter(a=>a[1]>0);return `<div class="falta">Entrega parcial: faltan ${r.map(a=>a[1]+' × '+esc(a[0])).join(', ')}. Lo pendiente quedará en el pedido.</div>`};
 const lockc=x=>`<label class="lk"><input type="checkbox" ${x.lock?'checked':''} onchange="tLock('${x.id}',this.checked)" aria-label="Impedir que el alumno borre el pedido de ${esc(x.alumno)}"><span>Bloquear</span></label>`;
@@ -520,7 +543,7 @@ const trash=x=>lockc(x)+`<button class="trash" aria-label="Borrar pedido de ${es
 h+='<h2>Pedidos</h2>';
 h+=P0.length?P0.map(x=>`<div class="ord s0" style="position:relative">${trash(x)}<div class="l1" style="padding-right:130px"><b>${esc(x.alumno)}</b><span class="stt">${x.parcial?'Entrega parcial':'Por preparar'}</span></div><small>Para: ${esc(x.para)} · ${dfmt(x.d)} · ${eur(x.total)}</small>`+x.items.map((i,k)=>{const v=tpv(x,k);return `<div class="row mat ${v<i.qty?'pend':'done'}"><div class="n"><b>${esc(i.name)}</b><small>Pedidas: ${i.qty}</small></div><div class="ctl"><button class="pm" aria-label="Una menos de ${esc(i.name)}" onclick="tpq('${x.id}',${k},-1)">−</button><span aria-label="Preparadas">${v}</span><button class="pm plus" aria-label="Una más de ${esc(i.name)}" onclick="tpq('${x.id}',${k},1)">+</button></div></div>`}).join('')+partTxt(x)+(tpPart(x)?`<button class="cta" style="margin-top:10px" onclick="tPartial('${x.id}')">Aceptar entrega parcial</button>`:'')+(tpAll(x)?`<button class="cta ok" style="margin-top:10px" onclick="tPrep('${x.id}')">Finalizado</button>`:'')+'</div>').join(''):'<div class="empty">No hay pedidos pendientes en esta clase.</div>';
 if(PF.length){h+='<h2>Finalizados</h2>'+PF.map(x=>`<div class="ord s2 fin" style="position:relative">${trash(x)}<div class="l1" style="padding-right:130px"><b>${esc(x.alumno)}</b><span class="stt">Finalizado</span></div><small>Para: ${esc(x.para)} · ${dfmt(x.d)} · ${eur(x.total)}</small><div style="margin-top:6px;font-size:14.5px">${x.items.map(i=>esc(i.name)+' × '+i.qty).join('<br>')}</div><button class="sm" style="margin-top:8px" onclick="tReopen('${x.id}')">Reabrir</button></div>`).join('')}
-return h+`<button class="cta" onclick="tRefresh()">Actualizar</button>`};
+return h+`<button class="cta" onclick="tRefresh()">Actualizar</button>`+tbkBtn()};
 
 V.info=()=>`<h2 style="margin-top:14px;font-size:22px">Cómo funciona</h2>
 <p class="sub">Esta app sirve para apuntar los pedidos de turrón y otros productos del viaje del Camino de Santiago y ver cuánto dinero llevamos recaudado.</p>
@@ -547,7 +570,7 @@ V.info=()=>`<h2 style="margin-top:14px;font-size:22px">Cómo funciona</h2>
 <ol class="gl">
 <li>Los pedidos se guardan en el móvil de cada alumno. No borres los datos del navegador ni desinstales la app.</li>
 <li>Usa siempre el mismo navegador o el icono de la pantalla de inicio. Si usas otro, verás la app vacía.</li>
-<li>Haz de vez en cuando una copia de seguridad: en Hucha o Historial, abajo, pulsa «Exportar copia». Para recuperarla, «Importar copia».</li>
+<li>Haz de vez en cuando una copia de seguridad: en Hucha o Historial, abajo, pulsa «Exportar copia». Para recuperarla, «Importar copia». Si pasan 7 días sin copia, la app te lo recuerda.</li>
 <li>Si no tienes conexión, el pedido se guarda y se envía a los profesores cuando vuelva internet.</li>
 <li>Los pedidos enviados a los profesores viajan cifrados. Solo se pueden leer con su contraseña.</li>
 </ol>
@@ -559,7 +582,7 @@ const TABS=[['pedidos','Pedidos'],['hucha','Hucha'],['historial','Historial'],['
 function render(){const T=tot();
 $('#hb').textContent=eur(T.paid)+' / '+eur(S.goal);$('#hf').style.width=pct()+'%';
 $('#nav').innerHTML=TABS.map(t=>`<button class="${S.tab===t[0]?'on':''}" onclick="tab('${t[0]}')">${t[1]}</button>`).join('');
-$('#v').innerHTML=V[S.tab]()+foot()}
+$('#v').innerHTML=(['pedidos','hucha','historial'].includes(S.tab)?bkBanner():'')+V[S.tab]()+foot()}
 render();
 </script>
 <script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})}</script>
