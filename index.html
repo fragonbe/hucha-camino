@@ -128,6 +128,7 @@ html{-webkit-text-size-adjust:100%}button,label{touch-action:manipulation}.lg{wi
 .ord small{display:block;color:var(--mute);font-size:12.5px;margin-top:2px}
 .stt{display:inline-block;font-size:12px;font-weight:800;padding:1px 9px;border-radius:8px;background:var(--s);color:#fff}
 .s1 .stt{color:#1f2b2e}
+.alm{font-size:13.5px;margin:8px 0 0;color:var(--mute)}.alr{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}.alr small{color:var(--mute)}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 2px}
 .chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:7px 13px;font-size:13.5px;font-weight:600}
 .chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -241,8 +242,8 @@ if(!n){toast('Escribe para quién es el pedido');const e=$('#on');if(e)e.focus()
 const items=S.products.filter(p=>S.draft.q[p.id]>0).map(p=>({pid:p.id,name:p.name,price:p.sell,qty:S.draft.q[p.id],rec:0}));
 if(!items.length){toast('Selecciona al menos un producto');return}
 const o0={id:nid('o'),name:n,d:new Date().toISOString(),items:items,paid:false};S.orders.push(o0);let msg='Pedido guardado en Historial';
-if(S.me.name&&S.me.cls){o0.cls=S.me.cls;S.out.push({id:o0.id,alumno:S.me.name,clase:S.me.cls,para:n,d:o0.d,total:Math.round(otot(o0)*100)/100,items:items.map(i=>({name:i.name,qty:i.qty,price:i.price})),prep:false});msg+='. Se enviará a los profesores'}
-else msg+=' (sin enviar: pon tu nombre y clase en Ajustes)';
+if(S.me.ok&&S.me.name&&S.me.cls){o0.cls=S.me.cls;S.out.push({id:o0.id,alumno:S.me.name,clase:S.me.cls,para:n,d:o0.d,total:Math.round(otot(o0)*100)/100,items:items.map(i=>({name:i.name,qty:i.qty,price:i.price})),prep:false});msg+='. Se enviará a los profesores'}
+else msg+=' (sin enviar: entra con tu nombre en Ajustes)';
 S.draft={name:'',q:{}};save();render();window.scrollTo(0,0);toast(msg);flush()}
 function openO(id){S.open=id;save();render();window.scrollTo(0,0);pullLocks()}
 function closeO(){S.open=null;save();render();window.scrollTo(0,0)}
@@ -452,20 +453,58 @@ for(const x of j){if(x.found){const o=O(x.found.name.split('/').pop());const v=!
 if(ch){save();const ae=document.activeElement;if(S.tab==='historial'&&!(ae&&ae.tagName==='INPUT'))render()}}catch(e){}finally{PLK=false}}
 window.addEventListener('online',()=>{flush();pullLocks()});window.addEventListener('focus',pullLocks);document.addEventListener('visibilitychange',()=>{if(!document.hidden)pullLocks()});
 setTimeout(flush,1500);setTimeout(pullLocks,2500);setInterval(flush,60000);setInterval(()=>{if(!document.hidden)pullLocks()},15000);
-function setMeName(v){S.me.name=v.trim().slice(0,60);save();const e=$('#mst');if(e)e.textContent=meTxt()}
-function setMeCls(c){S.me.cls=c;save();render()}
-const meTxt=()=>(S.me.name&&S.me.cls?'Pedidos de '+S.me.name+' ('+CLN[S.me.cls]+').':'Falta el nombre o la clase: los pedidos se quedarán solo en este móvil.')+(SUB()?'':' Este dispositivo no permite enviar pedidos cifrados; usa la web en Safari.');
-const ME=()=>`<h2>Alumno</h2><p class="sub">Pon tu nombre y tu clase para que tus pedidos lleguen a los profesores.</p>
-<div class="ed"><div class="full"><label for="mn">Nombre del alumno</label><input id="mn" type="text" value="${esc(S.me.name)}" maxlength="60" autocomplete="off" oninput="setMeName(this.value)"></div></div>
-<div class="chips">${CLS.map(c=>`<button class="chip ${S.me.cls===c?'on':''}" onclick="setMeCls('${c}')">${CLN[c]}</button>`).join('')}</div>
-<p class="sub" id="mst" style="margin-top:8px">${esc(meTxt())}</p>`;
+const ROS={'3A':['Agus','Lola','Carla','Claudia López','David Torres','Héctor','Jorge','Pau Peris','Pau Ruiz','Ruo Bing','Vicente','Darío'],'3B':[],'3C':[],'PDC':[]};
+const slug=x=>x.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+const AID=(c,n)=>c+'_'+slug(n);
+let AL={c:'',n:'',st:'',msg:'',busy:false,doc:null,tries:0,until:0};
+async function pwh(pw,salt){const km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']);return b64(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt,iterations:100000},km,256))}
+function alCls(c){AL={c,n:'',st:'',msg:'',busy:false,doc:null,tries:AL.tries,until:AL.until};render()}
+async function alPick(i){const n=(ROS[AL.c]||[])[i];if(!n||AL.busy)return;
+if(!SUB()){AL.msg='Este dispositivo no permite entrar; usa la web en Safari o Chrome.';render();return}
+AL.n=n;AL.st='';AL.doc=null;AL.msg='Comprobando…';AL.busy=true;render();
+try{const r=await fetch(FBU()+'/alumnos/'+encodeURIComponent(AID(AL.c,n))+'?key='+FB.key);
+if(r.status===404){AL.st='new';AL.msg=''}else if(r.ok){const j=await r.json();AL.doc=j.fields||{};AL.st='login';AL.msg=''}else throw 0}
+catch(e){AL.n='';AL.msg='No se pudo comprobar. Necesitas conexión para entrar; inténtalo de nuevo.'}
+AL.busy=false;render()}
+function alIn(c,n){S.me={name:n,cls:c,ok:true};AL={c:'',n:'',st:'',msg:'',busy:false,doc:null,tries:0,until:0};save();render();flush();toast('Hola, '+n)}
+function alOut(){if(!confirm('¿Salir? Tus pedidos y tu hucha se quedan en este móvil. Para volver a enviar pedidos tendrás que entrar con tu contraseña.'))return;S.me={name:'',cls:'',ok:false};save();render()}
+async function alCreate(){if(AL.busy)return;const p1=$('#apw').value.trim(),p2=$('#apw2').value.trim();
+if(p1.length<4){AL.msg='La contraseña debe tener al menos 4 caracteres.';render();return}
+if(p1!==p2){AL.msg='Las dos contraseñas no coinciden.';render();return}
+AL.busy=true;AL.msg='Creando…';render();
+try{const salt=crypto.getRandomValues(new Uint8Array(16)),h=await pwh(p1,salt),id=AID(AL.c,AL.n);
+const r=await fetch(FBU()+'/alumnos?documentId='+encodeURIComponent(id)+'&key='+FB.key,{method:'POST',headers:JH,body:JSON.stringify({fields:ff({id,clase:AL.c,nom:AL.n,salt:b64(salt),h})})});
+if(r.ok){const c=AL.c,n=AL.n;AL.busy=false;alIn(c,n);return}
+if(r.status===409){AL.busy=false;const i=ROS[AL.c].indexOf(AL.n);AL.n='';await alPick(i);AL.msg='Ese nombre ya tiene contraseña: introdúcela para entrar.';render();return}
+throw 0}catch(e){AL.msg='No se pudo crear la contraseña. Comprueba la conexión e inténtalo de nuevo.'}
+AL.busy=false;render()}
+async function alLogin(){if(AL.busy)return;if(Date.now()<AL.until){AL.msg='Demasiados intentos. Espera '+Math.ceil((AL.until-Date.now())/1000)+' s.';render();return}
+const p=$('#apw').value.trim();if(!p)return;AL.busy=true;
+try{const f=AL.doc||{},h=await pwh(p,unb64((f.salt||{}).stringValue||''));
+if(h===(f.h||{}).stringValue){const c=AL.c,n=AL.n;AL.busy=false;alIn(c,n);return}
+AL.tries++;if(AL.tries>=5){AL.tries=0;AL.until=Date.now()+30000;AL.msg='Contraseña incorrecta. Espera 30 s antes de volver a probar.'}else AL.msg='Contraseña incorrecta.'}
+catch(e){AL.msg='No se pudo comprobar la contraseña.'}
+AL.busy=false;render()}
+const meTxt=()=>SUB()?'':'Este dispositivo no permite enviar pedidos cifrados; usa la web en Safari.';
+const ME=()=>{let h='<h2>Alumno</h2>';
+if(S.me.ok){return h+`<p class="sub">Has entrado como <b>${esc(S.me.name)}</b> (${CLN[S.me.cls]}). Tus pedidos se envían a los profesores.</p><button class="sm" onclick="alOut()">Cambiar de alumno</button><p class="sub" style="margin-top:8px">${esc(meTxt())}</p>`}
+h+=`<p class="sub">Elige tu clase y pulsa tu nombre. La primera vez tendrás que crear una contraseña.</p>`;
+if(S.me.name&&S.me.cls)h+=`<p class="alm">Antes usabas el nombre «${esc(S.me.name)}». Para enviar pedidos, entra con tu nombre de la lista.</p>`;
+h+=`<div class="chips">${CLS.map(c=>`<button class="chip ${AL.c===c?'on':''}" onclick="alCls('${c}')">${CLN[c]}</button>`).join('')}</div>`;
+if(AL.c){const R=ROS[AL.c]||[];h+=R.length?`<div class="chips">${R.map((n,i)=>`<button class="chip ${AL.n===n?'on':''}" onclick="alPick(${i})">${esc(n)}</button>`).join('')}</div>`:`<p class="alm">La lista de esta clase todavía no está cargada. Pídesela a tu profesor.</p>`}
+if(AL.n&&AL.st==='new')h+=`<div class="ed"><div class="full"><label for="apw">Crea una contraseña para ${esc(AL.n)} (mínimo 4 caracteres)</label><input id="apw" type="password" autocomplete="new-password" maxlength="40"></div><div class="full"><label for="apw2">Repite la contraseña</label><input id="apw2" type="password" autocomplete="new-password" maxlength="40" onkeydown="if(event.key==='Enter')alCreate()"></div><div class="full"><button class="cta ok" onclick="alCreate()">Crear contraseña y entrar</button></div></div><p class="alm">Apúntala: si la olvidas, el profesor tiene que restablecerla.</p>`;
+if(AL.n&&AL.st==='login')h+=`<div class="ed"><div class="full"><label for="apw">Contraseña de ${esc(AL.n)}</label><input id="apw" type="password" autocomplete="current-password" maxlength="40" onkeydown="if(event.key==='Enter')alLogin()"></div><div class="full"><button class="cta ok" onclick="alLogin()">Entrar como ${esc(AL.n)}</button></div></div>`;
+if(AL.msg)h+=`<p class="alm" role="status" id="mst">${esc(AL.msg)}</p>`;
+else h+=`<p class="sub" id="mst">${esc(meTxt())}</p>`;
+return h};
 /* Profesores */
-let TU=false,TPR=null,TD=null,TC='',TERR='';
+let TU=false,TPR=null,TD=null,TC='',TERR='',TAL=null;
 async function tLoad(){const r=await fetch(FBU()+':runQuery?key='+FB.key,{method:'POST',headers:JH,body:JSON.stringify({structuredQuery:{from:[{collectionId:'pedidos'}]}})});
 if(!r.ok)throw new Error('http'+r.status);const j=await r.json(),out=[];
 for(const x of j){if(!x.document)continue;const f=x.document.fields,g=k=>f[k]&&(f[k].stringValue!==undefined?f[k].stringValue:f[k].booleanValue);
 if(!g('ct')||!g('epk'))continue;try{const o=await decOrder(TPR,{epk:g('epk'),ct:g('ct')});out.push(Object.assign(o,{id:g('id'),clase:g('clase'),d:g('d'),prep:!!g('prep'),lock:g('lock')===true}))}catch(e){}}
-out.sort((a,b)=>a.d<b.d?1:-1);TD=out;TERR=''}
+out.sort((a,b)=>a.d<b.d?1:-1);TD=out;TERR='';
+try{const r2=await fetch(FBU()+':runQuery?key='+FB.key,{method:'POST',headers:JH,body:JSON.stringify({structuredQuery:{from:[{collectionId:'alumnos'}]}})});if(r2.ok){const j2=await r2.json();TAL=new Set(j2.filter(x=>x.document).map(x=>x.document.name.split('/').pop()))}}catch(e){}}
 async function tTry(){const e=$('#tpw'),m=$('#tpe');
 if(sha256(npw(e.value))!==PWH){e.value='';m.textContent='Contraseña incorrecta';e.focus();return}
 if(!SUB()){m.textContent='Este dispositivo no permite leer pedidos cifrados; usa la web en Safari o Chrome.';return}
@@ -521,6 +560,9 @@ const blob=new Blob([csv],{type:'text/csv'});
 try{const file=new File([blob],fname,{type:'text/csv'});
 if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Pedidos de los profesores'});render();return}}catch(e){if(e&&e.name==='AbortError'){render();return}}
 const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);render()}
+const tal=()=>{const R=ROS[TC]||[];return `<h2>Contraseñas de alumnos</h2><p class="sub">Si un alumno olvida su contraseña, pulsa «Restablecer»: al entrar podrá crear otra.</p>`+(R.length?R.map((n,i)=>{const has=TAL&&TAL.has(AID(TC,n));return `<div class="alr"><span>${esc(n)}<br><small>${TAL?(has?'Con contraseña':'Aún no ha entrado'):'…'}</small></span>${has?`<button class="sm" onclick="tAlReset(${i})">Restablecer</button>`:''}</div>`}).join(''):'<p class="sub">La lista de esta clase todavía no está cargada.</p>')};
+async function tAlReset(i){const n=(ROS[TC]||[])[i];if(!n)return;if(!confirm('¿Restablecer la contraseña de '+n+'? Podrá crear una nueva al entrar.'))return;
+try{const id=AID(TC,n),r=await fetch(FBU()+'/alumnos/'+encodeURIComponent(id)+'?key='+FB.key,{method:'DELETE'});if(!r.ok&&r.status!==404)throw 0;if(TAL)TAL.delete(id);toast('Contraseña de '+n+' restablecida')}catch(e){toast('No se pudo restablecer')}render()}
 async function tLock(id,v){const d=(TD||[]).find(x=>x.id===id);if(!d)return;try{await tPatch(id,{lock:{booleanValue:v}},['lock']);d.lock=v;toast(v?'Pedido bloqueado: el alumno no puede borrarlo':'Pedido desbloqueado')}catch(e){toast('No se pudo guardar el cambio')}render()}
 async function tDel(id){const d=(TD||[]).find(x=>x.id===id);if(!d)return;if(d.lock){toast('Está bloqueado: desmarca «Bloquear» para poder borrarlo.');return}
 if(!confirm('¿Borrar el pedido de '+d.alumno+'? Desaparecerá para todos los profesores.'))return;
@@ -543,15 +585,15 @@ const trash=x=>lockc(x)+`<button class="trash" aria-label="Borrar pedido de ${es
 h+='<h2>Pedidos</h2>';
 h+=P0.length?P0.map(x=>`<div class="ord s0" style="position:relative">${trash(x)}<div class="l1" style="padding-right:130px"><b>${esc(x.alumno)}</b><span class="stt">${x.parcial?'Entrega parcial':'Por preparar'}</span></div><small>Para: ${esc(x.para)} · ${dfmt(x.d)} · ${eur(x.total)}</small>`+x.items.map((i,k)=>{const v=tpv(x,k);return `<div class="row mat ${v<i.qty?'pend':'done'}"><div class="n"><b>${esc(i.name)}</b><small>Pedidas: ${i.qty}</small></div><div class="ctl"><button class="pm" aria-label="Una menos de ${esc(i.name)}" onclick="tpq('${x.id}',${k},-1)">−</button><span aria-label="Preparadas">${v}</span><button class="pm plus" aria-label="Una más de ${esc(i.name)}" onclick="tpq('${x.id}',${k},1)">+</button></div></div>`}).join('')+partTxt(x)+(tpPart(x)?`<button class="cta" style="margin-top:10px" onclick="tPartial('${x.id}')">Aceptar entrega parcial</button>`:'')+(tpAll(x)?`<button class="cta ok" style="margin-top:10px" onclick="tPrep('${x.id}')">Finalizado</button>`:'')+'</div>').join(''):'<div class="empty">No hay pedidos pendientes en esta clase.</div>';
 if(PF.length){h+='<h2>Finalizados</h2>'+PF.map(x=>`<div class="ord s2 fin" style="position:relative">${trash(x)}<div class="l1" style="padding-right:130px"><b>${esc(x.alumno)}</b><span class="stt">Finalizado</span></div><small>Para: ${esc(x.para)} · ${dfmt(x.d)} · ${eur(x.total)}</small><div style="margin-top:6px;font-size:14.5px">${x.items.map(i=>esc(i.name)+' × '+i.qty).join('<br>')}</div><button class="sm" style="margin-top:8px" onclick="tReopen('${x.id}')">Reabrir</button></div>`).join('')}
-return h+`<button class="cta" onclick="tRefresh()">Actualizar</button>`+tbkBtn()};
+return h+`<button class="cta" onclick="tRefresh()">Actualizar</button>`+tal()+tbkBtn()};
 
 V.info=()=>`<h2 style="margin-top:14px;font-size:22px">Cómo funciona</h2>
 <p class="sub">Esta app sirve para apuntar los pedidos de turrón y otros productos del viaje del Camino de Santiago y ver cuánto dinero llevamos recaudado.</p>
 <h2>Para los alumnos</h2>
 <ol class="gl">
 <li><b>Instala la app.</b> Ábrela en Safari (iPhone) o Chrome (Android), pulsa Compartir o el menú y elige «Añadir a pantalla de inicio». Entra siempre desde ese icono.</li>
-<li><b>Pon tu nombre y tu clase.</b> Ve a Ajustes. Debajo de la contraseña, en «Alumno», escribe tu nombre y elige 3º A, 3º B, 3º C o PDC. No necesitas contraseña. Solo se hace una vez.</li>
-<li><b>Haz un pedido.</b> En Pedidos elige los productos con + y −, escribe para quién es y pulsa Finalizar. El pedido queda guardado en Historial y, si has puesto tu nombre y clase, se envía a los profesores.</li>
+<li><b>Entra con tu nombre.</b> Ve a Ajustes, en «Alumno», elige tu clase y pulsa tu nombre en la lista. La primera vez te pide crear una contraseña; después, cualquier móvil o navegador te la pedirá para entrar con ese nombre. Si la olvidas, el profesor puede restablecerla.</li>
+<li><b>Haz un pedido.</b> En Pedidos elige los productos con + y −, escribe para quién es y pulsa Finalizar. El pedido queda guardado en Historial y, si has entrado con tu nombre, se envía a los profesores.</li>
 <li><b>Sigue el pedido en Historial.</b> Gris: pedido hecho. Naranja: recibido. Verde: pagado. Puedes filtrar por estado.</li>
 <li><b>Marca lo que te llega.</b> Abre el pedido y usa − y + para indicar cuántas unidades de cada producto has recibido. Lo que falta aparece en rojo. Con todo recibido, el pedido pasa a naranja.</li>
 <li><b>Cobra y marca Pagado.</b> Cuando te paguen, pulsa «Pagado». El pedido se pone verde y su ganancia se suma a la Hucha. Si te equivocas, usa «Deshacer pago».</li>
