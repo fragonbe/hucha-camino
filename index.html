@@ -120,6 +120,7 @@ html{-webkit-text-size-adjust:100%}button,label{touch-action:manipulation}.lg{wi
 :root[data-theme="dark"]{--sg:#9aa9ab;--so:#f2a33a;--sv:#7cc18b}
 .s0{--s:var(--sg)}.s1{--s:var(--so)}.s2{--s:var(--sv)}
 .ord{display:block;width:100%;text-align:left;border:1px solid color-mix(in srgb,var(--s) 55%,var(--line));border-left:9px solid var(--s);background:color-mix(in srgb,var(--s) 14%,var(--card));border-radius:12px;padding:10px 12px;margin-top:8px}
+.lk{position:absolute;top:8px;right:46px;display:flex;align-items:center;gap:5px;font-size:13px;font-weight:700;cursor:pointer}.lk input{width:20px;height:20px;margin:0}
 .trash{position:absolute;top:6px;right:6px;width:32px;height:32px;border:1px solid var(--line);border-radius:8px;background:var(--card);font-size:17px;line-height:1;padding:0;cursor:pointer}
 .ord .l1{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
 .ord b{font-size:16px;font-weight:700}
@@ -242,14 +243,17 @@ const o0={id:nid('o'),name:n,d:new Date().toISOString(),items:items,paid:false};
 if(S.me.name&&S.me.cls){o0.cls=S.me.cls;S.out.push({id:o0.id,alumno:S.me.name,clase:S.me.cls,para:n,d:o0.d,total:Math.round(otot(o0)*100)/100,items:items.map(i=>({name:i.name,qty:i.qty,price:i.price})),prep:false});msg+='. Se enviará a los profesores'}
 else msg+=' (sin enviar: pon tu nombre y clase en Ajustes)';
 S.draft={name:'',q:{}};save();render();window.scrollTo(0,0);toast(msg);flush()}
-function openO(id){S.open=id;save();render();window.scrollTo(0,0)}
+function openO(id){S.open=id;save();render();window.scrollTo(0,0);pullLocks()}
 function closeO(){S.open=null;save();render();window.scrollTo(0,0)}
 function recq(id,k,d){const o=O(id);if(!o||o.paid)return;const i=o.items[k];let n=rcv(i)+d;if(n<0)n=i.qty;if(n>i.qty)n=i.qty;i.rec=n;save();render()}
 function pay(id){const o=O(id);if(!o||o.paid)return;const now=new Date().toISOString();
 o.items.forEach(i=>{if(!P(i.pid))return;for(let k=0;k<i.qty;k++)S.sales.push({id:nid('s'),pid:i.pid,d:now,paid:true,oid:id})});
 o.paid=true;o.pd=now;save();render();celebrate()}
 function unpay(id){const o=O(id);if(!o)return;S.sales=S.sales.filter(s=>s.oid!==id);o.paid=false;delete o.pd;save();render()}
-function delOrder(id){const o=O(id);if(!o)return;if(!confirm('¿Borrar el pedido de '+o.name+(o.paid?' y quitar su ganancia de la hucha':'')+'?'))return;
+async function delOrder(id){const o=O(id);if(!o)return;
+if(o.cls&&o.sent){let lk=o.lock;try{const r=await fetch(FBU()+'/pedidos/'+encodeURIComponent(id)+'?key='+FB.key);if(r.ok){const d=await r.json();lk=!!(d.fields&&d.fields.lock&&d.fields.lock.booleanValue)}else if(r.status!==404){toast('No se pudo comprobar el pedido. Inténtalo de nuevo.');return}}catch(e){toast('Necesitas conexión para borrar un pedido ya enviado a los profesores.');return}
+if(lk){o.lock=true;save();render();toast('El profesor ha bloqueado este pedido: no se puede borrar.');return}}
+if(!confirm('¿Borrar el pedido de '+o.name+(o.paid?' y quitar su ganancia de la hucha':'')+'?'))return;
 S.sales=S.sales.filter(s=>s.oid!==id);S.orders=S.orders.filter(x=>x.id!==id);
 if(o.cls){S.out=S.out.filter(x=>x.id!==id);S.del=S.del||[];if(!S.del.includes(id))S.del.push(id);setTimeout(flush,50)}
 S.open=null;save();render();window.scrollTo(0,0)}
@@ -369,7 +373,7 @@ o.items.forEach((i,k)=>{const r=rcv(i),miss=r<i.qty;h+=`<div class="row${miss?' 
 h+=`<div class="sum2"><span>${o.paid?'Pagado':'Te tienen que pagar'}</span><b>${eur(tot)}</b></div><button class="cta" onclick="shareOrder('${o.id}')">Compartir pedido</button>`;
 h+=o.paid?`<p class="sub" style="margin-top:8px">${eur(ogain(o))} de ganancia sumados a la hucha.</p><button class="cta" onclick="unpay('${o.id}')">Deshacer pago</button>`
 :`<button class="cta ok big2" onclick="pay('${o.id}')">Pagado</button><p class="sub" style="margin-top:6px">Al pulsar Pagado, ${eur(ogain(o))} de ganancia se suman a la hucha.</p>`;
-h+=`<button class="cta" style="border-color:var(--bad);color:var(--bad)" onclick="delOrder('${o.id}')">Borrar pedido</button>`;
+h+=o.lock?`<p class="sub lack" style="margin-top:10px">Pedido bloqueado por el profesor: no se puede borrar. Si hay que anularlo, habla con el profesor.</p>`:`<button class="cta" style="border-color:var(--bad);color:var(--bad)" onclick="delOrder('${o.id}')">Borrar pedido</button>`;
 return h}S.open=null}
 const f=S.filter,ords=[...S.orders].reverse(),dir=[...S.sales].filter(s=>!s.oid).reverse();
 const cnt={todos:ords.length+dir.length,pedido:ords.filter(o=>ostat(o)===0).length,recibido:ords.filter(o=>ostat(o)===1).length,pagado:ords.filter(o=>ostat(o)===2).length+dir.length};
@@ -383,7 +387,7 @@ lo.forEach(o=>{const st=ostat(o);h+=`<button class="ord s${st}" onclick="openO('
 if(ld.length){h+='<h2>Ventas anteriores</h2>'+ld.map(s=>{const p=P(s.pid);return`<div class="row"><div class="n"><b>${p?esc(p.name):'Producto borrado'}</b><small>${dfmt(s.d)} · ${eur(p?p.sell:0)} · ganas ${eur(gain(s))}</small></div><button class="sm red" aria-label="Borrar venta" onclick="delSale('${s.id}')">Borrar</button></div>`}).join('')}
 return h+BK()};
 
-const foot=()=>'<footer class="ft">Hecho por Darío</footer>';
+const foot=()=>'<footer class="ft">Hecho por Darío · 2026</footer>';
 
 V.ajustes=()=>{if(!UNL)return `<h2 style="margin-top:14px;font-size:22px">Ajustes</h2><p class="sub">Introduce la contraseña para entrar.</p>
 <div class="ed"><div class="full"><label for="pw">Contraseña</label><input id="pw" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')tryPw()"></div></div>
@@ -430,13 +434,19 @@ const key=await aesFrom(await crypto.subtle.deriveBits({name:'ECDH',public:epk},
 return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b.slice(0,12)},key,b.slice(12))))}
 let FL=false;
 async function flushDel(){if(!FB.proj||!S.del||!S.del.length)return;
-for(const id of S.del.slice()){try{const r=await fetch(FBU()+'/pedidos/'+encodeURIComponent(id)+'?key='+FB.key,{method:'DELETE'});if(r.ok||r.status===404){S.del=S.del.filter(x=>x!==id);save()}else break}catch(e){break}}}
+for(const id of S.del.slice()){try{const r=await fetch(FBU()+'/pedidos/'+encodeURIComponent(id)+'?key='+FB.key,{method:'DELETE'});if(r.ok||r.status===404||r.status===403){S.del=S.del.filter(x=>x!==id);save()}else break}catch(e){break}}}
 async function flush(){if(FL)return;await flushDel();if(!FB.proj||!S.out||!S.out.length||!SUB())return;FL=true;let n=0;
 try{for(const p of S.out.slice()){let r;try{const e=await encOrder({alumno:p.alumno,para:p.para,total:p.total,items:p.items});
 r=await fetch(FBU()+'/pedidos?documentId='+encodeURIComponent(p.id)+'&key='+FB.key,{method:'POST',headers:JH,body:JSON.stringify({fields:ff({id:p.id,clase:p.clase,d:p.d,prep:false,epk:e.epk,ct:e.ct})})})}catch(e){break}
 if(r.ok||r.status===409){S.out=S.out.filter(x=>x.id!==p.id);const o=O(p.id);if(o)o.sent=true;save();n++}else break}}finally{FL=false}
 if(n){toast(n>1?'Pedidos enviados a los profesores':'Pedido enviado a los profesores');if(S.tab==='historial')render()}}
-window.addEventListener('online',flush);setTimeout(flush,1500);setInterval(flush,60000);
+let PLK=false;
+async function pullLocks(){if(PLK||!FB.proj)return;const L=S.orders.filter(o=>o.cls&&o.sent).slice(0,100);if(!L.length)return;PLK=true;
+try{const base='projects/'+FB.proj+'/databases/(default)/documents/pedidos/';const r=await fetch(FBU()+':batchGet?key='+FB.key,{method:'POST',headers:JH,body:JSON.stringify({documents:L.map(o=>base+o.id)})});if(!r.ok)throw 0;const j=await r.json();let ch=false;
+for(const x of j){if(x.found){const o=O(x.found.name.split('/').pop());const v=!!(x.found.fields&&x.found.fields.lock&&x.found.fields.lock.booleanValue);if(o&&!!o.lock!==v){o.lock=v;ch=true}}}
+if(ch){save();const ae=document.activeElement;if(S.tab==='historial'&&!(ae&&ae.tagName==='INPUT'))render()}}catch(e){}finally{PLK=false}}
+window.addEventListener('online',()=>{flush();pullLocks()});window.addEventListener('focus',pullLocks);document.addEventListener('visibilitychange',()=>{if(!document.hidden)pullLocks()});
+setTimeout(flush,1500);setTimeout(pullLocks,2500);setInterval(flush,60000);setInterval(()=>{if(!document.hidden)pullLocks()},15000);
 function setMeName(v){S.me.name=v.trim().slice(0,60);save();const e=$('#mst');if(e)e.textContent=meTxt()}
 function setMeCls(c){S.me.cls=c;save();render()}
 const meTxt=()=>(S.me.name&&S.me.cls?'Pedidos de '+S.me.name+' ('+CLN[S.me.cls]+').':'Falta el nombre o la clase: los pedidos se quedarán solo en este móvil.')+(SUB()?'':' Este dispositivo no permite enviar pedidos cifrados; usa la web en Safari.');
@@ -449,7 +459,7 @@ let TU=false,TPR=null,TD=null,TC='',TERR='';
 async function tLoad(){const r=await fetch(FBU()+':runQuery?key='+FB.key,{method:'POST',headers:JH,body:JSON.stringify({structuredQuery:{from:[{collectionId:'pedidos'}]}})});
 if(!r.ok)throw new Error('http'+r.status);const j=await r.json(),out=[];
 for(const x of j){if(!x.document)continue;const f=x.document.fields,g=k=>f[k]&&(f[k].stringValue!==undefined?f[k].stringValue:f[k].booleanValue);
-if(!g('ct')||!g('epk'))continue;try{const o=await decOrder(TPR,{epk:g('epk'),ct:g('ct')});out.push(Object.assign(o,{id:g('id'),clase:g('clase'),d:g('d'),prep:!!g('prep')}))}catch(e){}}
+if(!g('ct')||!g('epk'))continue;try{const o=await decOrder(TPR,{epk:g('epk'),ct:g('ct')});out.push(Object.assign(o,{id:g('id'),clase:g('clase'),d:g('d'),prep:!!g('prep'),lock:g('lock')===true}))}catch(e){}}
 out.sort((a,b)=>a.d<b.d?1:-1);TD=out;TERR=''}
 async function tTry(){const e=$('#tpw'),m=$('#tpe');
 if(sha256(npw(e.value))!==PWH){e.value='';m.textContent='Contraseña incorrecta';e.focus();return}
@@ -488,7 +498,8 @@ await tPatch(id,{prep:{booleanValue:true},epk:{stringValue:e2.epk},ct:{stringVal
 o.items=del;o.total=orTot(del);o.prep=true;if(S.tp)delete S.tp[id];save();render();toast('Entrega parcial registrada')}
 catch(x){if(undo){try{await undo()}catch(y){}}toast('No se pudo registrar la entrega parcial');tRefresh()}}
 function tReopen(id){if(S.tp)delete S.tp[id];save();tPrep(id)}
-async function tDel(id){const d=(TD||[]).find(x=>x.id===id);if(!d)return;
+async function tLock(id,v){const d=(TD||[]).find(x=>x.id===id);if(!d)return;try{await tPatch(id,{lock:{booleanValue:v}},['lock']);d.lock=v;toast(v?'Pedido bloqueado: el alumno no puede borrarlo':'Pedido desbloqueado')}catch(e){toast('No se pudo guardar el cambio')}render()}
+async function tDel(id){const d=(TD||[]).find(x=>x.id===id);if(!d)return;if(d.lock){toast('Está bloqueado: desmarca «Bloquear» para poder borrarlo.');return}
 if(!confirm('¿Borrar el pedido de '+d.alumno+'? Desaparecerá para todos los profesores.'))return;
 if(!confirm('Segunda confirmación: el pedido de '+d.alumno+' se borrará definitivamente y no se puede recuperar. ¿Borrarlo?'))return;
 try{const r=await fetch(FBU()+'/pedidos/'+encodeURIComponent(id)+'?key='+FB.key,{method:'DELETE'});if(!r.ok&&r.status!==404)throw 0;TD=TD.filter(x=>x.id!==id);render();toast('Pedido borrado')}catch(e){toast('No se pudo borrar el pedido')}}
@@ -504,10 +515,11 @@ const L=by(TC),P0=L.filter(x=>!x.prep),PF=L.filter(x=>x.prep);const m={};P0.forE
 let h=`<button class="back" onclick="tSel('')">← Clases</button><h2>${CLN[TC]}</h2>${err}<h2>Material por preparar</h2>`;
 const ks=Object.keys(m);h+=ks.length?ks.map(k=>`<div class="row mat${m[k]?'':' done'}"><div class="n"><b>${esc(k)}</b></div><span class="tot">${m[k]} ud.</span></div>`).join(''):'<div class="empty">No hay material pendiente.</div>';
 const partTxt=x=>{if(!tpPart(x))return '';const r=x.items.map((i,k)=>[i.name,i.qty-tpv(x,k)]).filter(a=>a[1]>0);return `<div class="falta">Entrega parcial: faltan ${r.map(a=>a[1]+' × '+esc(a[0])).join(', ')}. Lo pendiente quedará en el pedido.</div>`};
-const trash=x=>`<button class="trash" aria-label="Borrar pedido de ${esc(x.alumno)}" title="Borrar pedido" onclick="tDel('${x.id}')">🗑</button>`;
+const lockc=x=>`<label class="lk"><input type="checkbox" ${x.lock?'checked':''} onchange="tLock('${x.id}',this.checked)" aria-label="Impedir que el alumno borre el pedido de ${esc(x.alumno)}"><span>Bloquear</span></label>`;
+const trash=x=>lockc(x)+`<button class="trash" aria-label="Borrar pedido de ${esc(x.alumno)}" title="Borrar pedido" onclick="tDel('${x.id}')">🗑</button>`;
 h+='<h2>Pedidos</h2>';
-h+=P0.length?P0.map(x=>`<div class="ord s0" style="position:relative">${trash(x)}<div class="l1" style="padding-right:38px"><b>${esc(x.alumno)}</b><span class="stt">${x.parcial?'Entrega parcial':'Por preparar'}</span></div><small>Para: ${esc(x.para)} · ${dfmt(x.d)} · ${eur(x.total)}</small>`+x.items.map((i,k)=>{const v=tpv(x,k);return `<div class="row mat ${v<i.qty?'pend':'done'}"><div class="n"><b>${esc(i.name)}</b><small>Pedidas: ${i.qty}</small></div><div class="ctl"><button class="pm" aria-label="Una menos de ${esc(i.name)}" onclick="tpq('${x.id}',${k},-1)">−</button><span aria-label="Preparadas">${v}</span><button class="pm plus" aria-label="Una más de ${esc(i.name)}" onclick="tpq('${x.id}',${k},1)">+</button></div></div>`}).join('')+partTxt(x)+(tpPart(x)?`<button class="cta" style="margin-top:10px" onclick="tPartial('${x.id}')">Aceptar entrega parcial</button>`:'')+(tpAll(x)?`<button class="cta ok" style="margin-top:10px" onclick="tPrep('${x.id}')">Finalizado</button>`:'')+'</div>').join(''):'<div class="empty">No hay pedidos pendientes en esta clase.</div>';
-if(PF.length){h+='<h2>Finalizados</h2>'+PF.map(x=>`<div class="ord s2 fin" style="position:relative">${trash(x)}<div class="l1" style="padding-right:38px"><b>${esc(x.alumno)}</b><span class="stt">Finalizado</span></div><small>Para: ${esc(x.para)} · ${dfmt(x.d)} · ${eur(x.total)}</small><div style="margin-top:6px;font-size:14.5px">${x.items.map(i=>esc(i.name)+' × '+i.qty).join('<br>')}</div><button class="sm" style="margin-top:8px" onclick="tReopen('${x.id}')">Reabrir</button></div>`).join('')}
+h+=P0.length?P0.map(x=>`<div class="ord s0" style="position:relative">${trash(x)}<div class="l1" style="padding-right:130px"><b>${esc(x.alumno)}</b><span class="stt">${x.parcial?'Entrega parcial':'Por preparar'}</span></div><small>Para: ${esc(x.para)} · ${dfmt(x.d)} · ${eur(x.total)}</small>`+x.items.map((i,k)=>{const v=tpv(x,k);return `<div class="row mat ${v<i.qty?'pend':'done'}"><div class="n"><b>${esc(i.name)}</b><small>Pedidas: ${i.qty}</small></div><div class="ctl"><button class="pm" aria-label="Una menos de ${esc(i.name)}" onclick="tpq('${x.id}',${k},-1)">−</button><span aria-label="Preparadas">${v}</span><button class="pm plus" aria-label="Una más de ${esc(i.name)}" onclick="tpq('${x.id}',${k},1)">+</button></div></div>`}).join('')+partTxt(x)+(tpPart(x)?`<button class="cta" style="margin-top:10px" onclick="tPartial('${x.id}')">Aceptar entrega parcial</button>`:'')+(tpAll(x)?`<button class="cta ok" style="margin-top:10px" onclick="tPrep('${x.id}')">Finalizado</button>`:'')+'</div>').join(''):'<div class="empty">No hay pedidos pendientes en esta clase.</div>';
+if(PF.length){h+='<h2>Finalizados</h2>'+PF.map(x=>`<div class="ord s2 fin" style="position:relative">${trash(x)}<div class="l1" style="padding-right:130px"><b>${esc(x.alumno)}</b><span class="stt">Finalizado</span></div><small>Para: ${esc(x.para)} · ${dfmt(x.d)} · ${eur(x.total)}</small><div style="margin-top:6px;font-size:14.5px">${x.items.map(i=>esc(i.name)+' × '+i.qty).join('<br>')}</div><button class="sm" style="margin-top:8px" onclick="tReopen('${x.id}')">Reabrir</button></div>`).join('')}
 return h+`<button class="cta" onclick="tRefresh()">Actualizar</button>`};
 
 V.info=()=>`<h2 style="margin-top:14px;font-size:22px">Cómo funciona</h2>
@@ -529,7 +541,7 @@ V.info=()=>`<h2 style="margin-top:14px;font-size:22px">Cómo funciona</h2>
 <li>Elige una de las cuatro clases. Verás el <b>material por preparar</b> (suma de productos) y los pedidos de cada alumno.</li>
 <li>En cada pedido, usa − y + para marcar las unidades que vas entregando. El «material por preparar» de arriba va restando lo marcado. Con todo al máximo aparece «Finalizado» y el pedido pasa a verde, en «Finalizados».</li>
 <li>Si no puedes entregar todo, aparece un aviso de <b>entrega parcial</b>. Al pulsar «Aceptar entrega parcial», lo marcado queda como entregado y lo que falta se añade al pedido de la semana siguiente (desde el lunes), que no cuenta en el material de esta semana.</li>
-<li>La papelera de cada pedido lo borra para todos los profesores, con doble confirmación. Pulsa «Actualizar» para ver los pedidos nuevos; también se refresca solo.</li>
+<li>Arriba a la derecha de cada pedido hay una casilla <b>Bloquear</b>. Si la marcas, el alumno no podrá borrar ese pedido (le aparece un aviso). Para borrarlo tú, desmárcala primero. La papelera de cada pedido lo borra para todos los profesores, con doble confirmación. Pulsa «Actualizar» para ver los pedidos nuevos; también se refresca solo.</li>
 </ol>
 <h2>Importante</h2>
 <ol class="gl">

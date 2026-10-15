@@ -1,4 +1,4 @@
-const V = 'hucha-v26';
+const V = 'hucha-v27';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
