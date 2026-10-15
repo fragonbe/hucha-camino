@@ -467,15 +467,28 @@ const tpAll=o=>o.items.every((i,k)=>tpv(o,k)>=i.qty);
 function tpq(id,k,d){const o=(TD||[]).find(x=>x.id===id);if(!o||o.prep)return;const mx=o.items[k].qty;let n=tpv(o,k)+d;if(n<0)n=mx;if(n>mx)n=mx;S.tp=S.tp||{};const a=S.tp[id]=S.tp[id]||[];a[k]=n;save();render()}
 const tpAny=o=>o.items.some((i,k)=>tpv(o,k)<i.qty);
 const tpPart=o=>tpAny(o)&&o.items.some((i,k)=>tpv(o,k)>0);
-async function tAdj(id){const o=(TD||[]).find(x=>x.id===id);if(!o||o.prep||!tpAny(o))return;
-const F=(o.falta||[]).map(f=>({name:f.name,qty:f.qty})),nI=[];
-o.items.forEach((i,k)=>{const v=tpv(o,k),m=i.qty-v;if(m>0){const f=F.find(x=>x.name===i.name);if(f)f.qty+=m;else F.push({name:i.name,qty:m})}if(v>0)nI.push({name:i.name,qty:v,price:i.price})});
-const txt=F.map(f=>f.qty+' × '+f.name).join(', ');
-if(!confirm('Se reducirá el pedido de '+o.alumno+' a lo que has marcado. Faltarán por pedir: '+txt+'. ¿Continuar?'))return;
-const tot=Math.round(nI.reduce((a,i)=>a+i.qty*i.price,0)*100)/100;
-try{const e=await encOrder({alumno:o.alumno,para:o.para,total:tot,items:nI,falta:F});
-const r=await fetch(FBU()+'/pedidos/'+encodeURIComponent(id)+'?updateMask.fieldPaths=epk&updateMask.fieldPaths=ct&key='+FB.key,{method:'PATCH',headers:JH,body:JSON.stringify({fields:{epk:{stringValue:e.epk},ct:{stringValue:e.ct}}})});if(!r.ok)throw 0;
-o.items=nI;o.total=tot;o.falta=F;S.tp=S.tp||{};S.tp[id]=nI.map(i=>i.qty);save();render();toast('Pedido ajustado')}catch(x){toast('No se pudo ajustar el pedido')}}
+const wkOf=d=>{const t=new Date(d);t.setHours(0,0,0,0);t.setDate(t.getDate()-((t.getDay()+6)%7));return t.getTime()};
+const wkNow=()=>wkOf(Date.now());
+const isNext=x=>wkOf(x.d)>wkNow();
+const nextWeekISO=()=>{const t=new Date(wkNow());t.setDate(t.getDate()+7);return t.toISOString()};
+const dlong=d=>new Date(d).toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
+const orTot=it=>Math.round(it.reduce((a,i)=>a+i.qty*i.price,0)*100)/100;
+async function tPatch(id,fields,mask){const r=await fetch(FBU()+'/pedidos/'+encodeURIComponent(id)+'?'+mask.map(m=>'updateMask.fieldPaths='+m).join('&')+'&key='+FB.key,{method:'PATCH',headers:JH,body:JSON.stringify({fields})});if(!r.ok)throw new Error('patch'+r.status)}
+async function tPartial(id){const o=(TD||[]).find(x=>x.id===id);if(!o||o.prep||!tpPart(o))return;
+const del=[],rest=[];o.items.forEach((i,k)=>{const v=tpv(o,k);if(v>0)del.push({name:i.name,qty:v,price:i.price});if(i.qty-v>0)rest.push({name:i.name,qty:i.qty-v,price:i.price})});
+const L=a=>a.map(f=>f.qty+' × '+f.name).join(', ');
+if(!confirm('ENTREGA PARCIAL a '+o.alumno+'.\nSe entrega: '+L(del)+'.\nQueda pendiente: '+L(rest)+'.\nLo pendiente se añadirá al pedido de la semana siguiente (desde el '+dlong(nextWeekISO())+'). ¿Aceptar?'))return;
+try{
+const nx=(TD||[]).find(x=>x.clase===o.clase&&x.alumno===o.alumno&&x.para===o.para&&!x.prep&&x.id!==o.id&&isNext(x));
+if(nx){const its=nx.items.map(i=>({name:i.name,qty:i.qty,price:i.price}));rest.forEach(r=>{const f=its.find(i=>i.name===r.name);if(f)f.qty+=r.qty;else its.push(r)});
+const e=await encOrder({alumno:nx.alumno,para:nx.para,total:orTot(its),items:its});await tPatch(nx.id,{epk:{stringValue:e.epk},ct:{stringValue:e.ct}},['epk','ct']);nx.items=its;nx.total=orTot(its)}
+else{const nid2=nid('o'),d2=nextWeekISO(),e=await encOrder({alumno:o.alumno,para:o.para,total:orTot(rest),items:rest});
+const r=await fetch(FBU()+'/pedidos?documentId='+encodeURIComponent(nid2)+'&key='+FB.key,{method:'POST',headers:JH,body:JSON.stringify({fields:ff({id:nid2,clase:o.clase,d:d2,prep:false,epk:e.epk,ct:e.ct})})});if(!r.ok)throw new Error('create'+r.status);
+TD.push({id:nid2,clase:o.clase,d:d2,prep:false,alumno:o.alumno,para:o.para,total:orTot(rest),items:rest})}
+const e2=await encOrder({alumno:o.alumno,para:o.para,total:orTot(del),items:del});
+await tPatch(id,{prep:{booleanValue:true},epk:{stringValue:e2.epk},ct:{stringValue:e2.ct}},['prep','epk','ct']);
+o.items=del;o.total=orTot(del);o.prep=true;if(S.tp)delete S.tp[id];save();render();toast('Entrega parcial registrada')}
+catch(x){toast('No se pudo registrar la entrega parcial');tRefresh()}}
 function tReopen(id){if(S.tp)delete S.tp[id];save();tPrep(id)}
 async function tDel(id){const d=(TD||[]).find(x=>x.id===id);if(!d)return;
 if(!confirm('¿Borrar el pedido de '+d.alumno+'? Desaparecerá para todos los profesores.'))return;
@@ -488,15 +501,16 @@ V.clases=()=>{if(!TU)return `<h2 style="margin-top:14px;font-size:22px">Clases</
 <p id="tpe" class="lack" role="alert" style="margin:8px 0 0;min-height:1.4em"></p><button class="cta ok" onclick="tTry()">Entrar</button>`;
 const D=TD||[];const by=c=>D.filter(x=>x.clase===c);
 const err=TERR?`<p class="lack" role="alert">${esc(TERR)}</p>`:'';
-if(!TC){return `<h2 style="margin-top:14px;font-size:22px">Clases</h2><p class="sub">Elige una clase para ver los pedidos de sus alumnos.</p>${err}`+CLS.map(c=>{const L=by(c),np=L.filter(x=>!x.prep).length;return `<button class="cta" style="text-align:left;padding:16px" onclick="tSel('${c}')"><b style="font-size:19px">${CLN[c]}</b><br><small style="font-weight:500">${L.length} pedido${L.length===1?'':'s'}${np?' · '+np+' por preparar':L.length?' · todo preparado':''}</small></button>`}).join('')+`<button class="cta" onclick="tRefresh()">Actualizar</button>`}
-const L=by(TC),P0=L.filter(x=>!x.prep),PF=L.filter(x=>x.prep);const m={};P0.forEach(x=>x.items.forEach(i=>{m[i.name]=(m[i.name]||0)+i.qty}));
+if(!TC){return `<h2 style="margin-top:14px;font-size:22px">Clases</h2><p class="sub">Elige una clase para ver los pedidos de sus alumnos.</p>${err}`+CLS.map(c=>{const L=by(c),np=L.filter(x=>!x.prep&&!isNext(x)).length;return `<button class="cta" style="text-align:left;padding:16px" onclick="tSel('${c}')"><b style="font-size:19px">${CLN[c]}</b><br><small style="font-weight:500">${L.length} pedido${L.length===1?'':'s'}${np?' · '+np+' por preparar':L.length?' · todo preparado':''}</small></button>`}).join('')+`<button class="cta" onclick="tRefresh()">Actualizar</button>`}
+const L=by(TC),P0=L.filter(x=>!x.prep&&!isNext(x)),PN=L.filter(x=>!x.prep&&isNext(x)),PF=L.filter(x=>x.prep);const m={};P0.forEach(x=>x.items.forEach((i,k)=>{m[i.name]=(m[i.name]||0)+Math.max(0,i.qty-tpv(x,k))}));
 let h=`<button class="back" onclick="tSel('')">← Clases</button><h2>${CLN[TC]}</h2>${err}<h2>Material por preparar</h2>`;
-const ks=Object.keys(m);h+=ks.length?ks.map(k=>`<div class="row mat"><div class="n"><b>${esc(k)}</b></div><span class="tot">${m[k]} ud.</span></div>`).join(''):'<div class="empty">No hay material pendiente.</div>';
-const faltaTxt=x=>(x.falta&&x.falta.length)?`<div class="falta">Faltan por pedir: ${x.falta.map(f=>esc(f.name)+' × '+f.qty).join(', ')}</div>`:'';
+const ks=Object.keys(m);h+=ks.length?ks.map(k=>`<div class="row mat${m[k]?'':' done'}"><div class="n"><b>${esc(k)}</b></div><span class="tot">${m[k]} ud.</span></div>`).join(''):'<div class="empty">No hay material pendiente.</div>';
+const partTxt=x=>{if(!tpPart(x))return '';const r=x.items.map((i,k)=>[i.name,i.qty-tpv(x,k)]).filter(a=>a[1]>0);return `<div class="falta">Entrega parcial: faltan ${r.map(a=>a[1]+' × '+esc(a[0])).join(', ')}. Lo pendiente pasará al pedido de la semana siguiente.</div>`};
 const trash=x=>`<button class="trash" aria-label="Borrar pedido de ${esc(x.alumno)}" title="Borrar pedido" onclick="tDel('${x.id}')">🗑</button>`;
 h+='<h2>Pedidos</h2>';
-h+=P0.length?P0.map(x=>`<div class="ord s0" style="position:relative">${trash(x)}<div class="l1" style="padding-right:38px"><b>${esc(x.alumno)}</b><span class="stt">Por preparar</span></div><small>Para: ${esc(x.para)} · ${dfmt(x.d)} · ${eur(x.total)}</small>`+x.items.map((i,k)=>{const v=tpv(x,k);return `<div class="row mat ${v<i.qty?'pend':'done'}"><div class="n"><b>${esc(i.name)}</b><small>Pedidas: ${i.qty}</small></div><div class="ctl"><button class="pm" aria-label="Una menos de ${esc(i.name)}" onclick="tpq('${x.id}',${k},-1)">−</button><span aria-label="Preparadas">${v}</span><button class="pm plus" aria-label="Una más de ${esc(i.name)}" onclick="tpq('${x.id}',${k},1)">+</button></div></div>`}).join('')+faltaTxt(x)+(tpPart(x)?`<button class="sm" style="margin-top:10px" onclick="tAdj('${x.id}')">Ajustar pedido a lo preparado</button>`:'')+(tpAll(x)?`<button class="cta ok" style="margin-top:10px" onclick="tPrep('${x.id}')">Finalizado</button>`:'')+'</div>').join(''):'<div class="empty">No hay pedidos pendientes en esta clase.</div>';
-if(PF.length){h+='<h2>Finalizados</h2>'+PF.map(x=>`<div class="ord s2 fin" style="position:relative">${trash(x)}<div class="l1" style="padding-right:38px"><b>${esc(x.alumno)}</b><span class="stt">Finalizado</span></div><small>Para: ${esc(x.para)} · ${dfmt(x.d)} · ${eur(x.total)}</small><div style="margin-top:6px;font-size:14.5px">${x.items.map(i=>esc(i.name)+' × '+i.qty).join('<br>')}</div>${faltaTxt(x)}<button class="sm" style="margin-top:8px" onclick="tReopen('${x.id}')">Reabrir</button></div>`).join('')}
+h+=P0.length?P0.map(x=>`<div class="ord s0" style="position:relative">${trash(x)}<div class="l1" style="padding-right:38px"><b>${esc(x.alumno)}</b><span class="stt">Por preparar</span></div><small>Para: ${esc(x.para)} · ${dfmt(x.d)} · ${eur(x.total)}</small>`+x.items.map((i,k)=>{const v=tpv(x,k);return `<div class="row mat ${v<i.qty?'pend':'done'}"><div class="n"><b>${esc(i.name)}</b><small>Pedidas: ${i.qty}</small></div><div class="ctl"><button class="pm" aria-label="Una menos de ${esc(i.name)}" onclick="tpq('${x.id}',${k},-1)">−</button><span aria-label="Preparadas">${v}</span><button class="pm plus" aria-label="Una más de ${esc(i.name)}" onclick="tpq('${x.id}',${k},1)">+</button></div></div>`}).join('')+partTxt(x)+(tpPart(x)?`<button class="cta" style="margin-top:10px" onclick="tPartial('${x.id}')">Aceptar entrega parcial</button>`:'')+(tpAll(x)?`<button class="cta ok" style="margin-top:10px" onclick="tPrep('${x.id}')">Finalizado</button>`:'')+'</div>').join(''):'<div class="empty">No hay pedidos pendientes en esta clase.</div>';
+if(PN.length){h+='<h2>Semana siguiente</h2><p class="sub">Pedidos pendientes que se preparan a partir del '+dlong(nextWeekISO())+'.</p>'+PN.map(x=>`<div class="ord s1" style="position:relative">${trash(x)}<div class="l1" style="padding-right:38px"><b>${esc(x.alumno)}</b><span class="stt">Semana siguiente</span></div><small>Para: ${esc(x.para)} · ${eur(x.total)}</small><div style="margin-top:6px;font-size:14.5px">${x.items.map(i=>esc(i.name)+' × '+i.qty).join('<br>')}</div></div>`).join('')}
+if(PF.length){h+='<h2>Finalizados</h2>'+PF.map(x=>`<div class="ord s2 fin" style="position:relative">${trash(x)}<div class="l1" style="padding-right:38px"><b>${esc(x.alumno)}</b><span class="stt">Finalizado</span></div><small>Para: ${esc(x.para)} · ${dfmt(x.d)} · ${eur(x.total)}</small><div style="margin-top:6px;font-size:14.5px">${x.items.map(i=>esc(i.name)+' × '+i.qty).join('<br>')}</div><button class="sm" style="margin-top:8px" onclick="tReopen('${x.id}')">Reabrir</button></div>`).join('')}
 return h+`<button class="cta" onclick="tRefresh()">Actualizar</button>`};
 
 V.info=()=>`<h2 style="margin-top:14px;font-size:22px">Cómo funciona</h2>
@@ -516,7 +530,9 @@ V.info=()=>`<h2 style="margin-top:14px;font-size:22px">Cómo funciona</h2>
 <ol class="gl">
 <li>Ve a la pestaña <b>Clases</b> y escribe la contraseña de profesores.</li>
 <li>Elige una de las cuatro clases. Verás el <b>material por preparar</b> (suma de productos) y los pedidos de cada alumno.</li>
-<li>Cuando un pedido esté listo, pulsa «Marcar como preparado». Pulsa «Actualizar» para ver los pedidos nuevos; también se refresca solo.</li>
+<li>En cada pedido, usa − y + para marcar las unidades que vas entregando. El «material por preparar» de arriba va restando lo marcado. Con todo al máximo aparece «Finalizado» y el pedido pasa a verde, en «Finalizados».</li>
+<li>Si no puedes entregar todo, aparece un aviso de <b>entrega parcial</b>. Al pulsar «Aceptar entrega parcial», lo marcado queda como entregado y lo que falta se añade al pedido de la semana siguiente (desde el lunes), que no cuenta en el material de esta semana.</li>
+<li>La papelera de cada pedido lo borra para todos los profesores, con doble confirmación. Pulsa «Actualizar» para ver los pedidos nuevos; también se refresca solo.</li>
 </ol>
 <h2>Importante</h2>
 <ol class="gl">
